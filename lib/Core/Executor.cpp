@@ -1190,6 +1190,8 @@ void Executor::executeCall(ExecutionState &state,
                            KInstruction *ki,
                            Function *f,
                            std::vector< ref<Expr> > &arguments) {
+  state.callPath += ("call: " + f->getName() + "\n").str();
+
   Instruction *i = ki->inst;
   if (f && f->isDeclaration()) {
     switch(f->getIntrinsicID()) {
@@ -2836,6 +2838,7 @@ void Executor::terminateState(ExecutionState &state) {
                       "replay did not consume all objects in test input.");
   }
 
+  interpreterHandler->processCallPath(state);
   interpreterHandler->incPathsExplored();
 
   std::vector<ExecutionState *>::iterator it =

@@ -44,6 +44,7 @@ public:
   virtual void processTestCase(const ExecutionState &state,
                                const char *err, 
                                const char *suffix) = 0;
+  virtual void processCallPath(const ExecutionState &state) = 0;
 };
 
 class Interpreter {
