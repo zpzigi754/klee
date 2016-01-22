@@ -23,6 +23,10 @@
 #include <set>
 #include <vector>
 
+namespace llvm {
+  class Function;
+}
+
 namespace klee {
 class Array;
 class CallPathNode;
@@ -142,7 +146,7 @@ public:
   /// @brief Set of used array names for this state.  Used to avoid collisions.
   std::set<std::string> arrayNames;
 
-  std::string callPath;
+  std::vector<llvm::Function *> callPath;
 
   std::string getFnAlias(std::string fn);
   void addFnAlias(std::string old_fn, std::string new_fn);
