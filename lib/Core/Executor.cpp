@@ -1113,7 +1113,7 @@ void Executor::executeCall(ExecutionState &state,
                            KInstruction *ki,
                            Function *f,
                            std::vector< ref<Expr> > &arguments) {
-  state.callPath += ("call: " + f->getName() + "\n").str();
+  state.callPath.push_back(f);
 
   Instruction *i = ki->inst;
   if (f && f->isDeclaration()) {

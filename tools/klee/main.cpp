@@ -217,6 +217,7 @@ private:
   Interpreter *m_interpreter;
   TreeStreamWriter *m_pathWriter, *m_symPathWriter;
   llvm::raw_ostream *m_infoFile;
+  std::map<const Function*, bool> m_functionsOfInterestCache;
 
   SmallString<128> m_outputDirectory;
 
@@ -243,6 +244,8 @@ public:
                        const char *errorMessage,
                        const char *errorSuffix);
   void processCallPath(const ExecutionState &state);
+
+  bool functionInteresting(const Function* fun);
 
   std::string getOutputFilename(const std::string &filename);
   llvm::raw_fd_ostream *openOutputFile(const std::string &filename);
@@ -537,13 +540,30 @@ void KleeHandler::processTestCase(const ExecutionState &state,
   }
 }
 
+bool KleeHandler::functionInteresting(const Function* fun) {
+  std::map<const Function*, bool>::iterator iter = m_functionsOfInterestCache.find(fun);
+  if (iter != m_functionsOfInterestCache.end()) {
+    return iter->second;
+  }
+  bool rez = false;
+  StringRef name = fun->getName();
+  rez = name.endswith("_stub");
+  m_functionsOfInterestCache.insert(std::make_pair(fun, rez));
+  return rez;
+}
+
 void KleeHandler::processCallPath(const ExecutionState &state) {
   unsigned id = ++m_callPathIndex;
   std::stringstream filename;
   filename << "call-path" << std::setfill('0') << std::setw(6) << id << '.' << "txt";
-  llvm::raw_ostream *f = openOutputFile(filename.str());
-  *f << state.callPath;
-  delete f;
+  llvm::raw_ostream *file = openOutputFile(filename.str());
+  for (std::vector<Function*>::const_iterator iter = state.callPath.begin(),
+         end = state.callPath.end(); iter != end; ++iter) {
+    Function* fun = *iter;
+    if (functionInteresting(fun))
+      *file << fun->getName() <<"\n";
+  }
+  delete file;
 }
 
   // load a .path file
