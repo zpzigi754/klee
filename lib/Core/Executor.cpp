@@ -3342,6 +3342,13 @@ void Executor::executeMemoryOperation(ExecutionState &state,
       value = state.constraints.simplifyExpr(value);
   }
 
+  if (!isa<ConstantExpr>(address)) {
+    printf("\n");
+    printf("Some symbolic indexing going on here:\n");
+    llvm::errs() << state.pc->getSourceLocation();
+    state.dumpStack(llvm::errs());
+  }
+
   // fast path: single in-bounds resolution
   ObjectPair op;
   bool success;
