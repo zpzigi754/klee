@@ -65,6 +65,14 @@ struct StackFrame {
   ~StackFrame();
 };
 
+struct CallInfo {
+  llvm::Function* f;
+  std::vector< ref<Expr> > args;
+  ref<Expr> ret;
+  CallInfo(llvm::Function* f_, const std::vector< ref<Expr> > &args_)
+    :f(f_), args(args_), ret() {}
+};
+
 /// @brief ExecutionState representing a path under exploration
 class ExecutionState {
 public:
@@ -145,7 +153,7 @@ public:
   /// @brief Set of used array names for this state.  Used to avoid collisions.
   std::set<std::string> arrayNames;
 
-  std::vector<llvm::Function *> callPath;
+  std::vector<CallInfo> callPath;
 
   std::string getFnAlias(std::string fn);
   void addFnAlias(std::string old_fn, std::string new_fn);

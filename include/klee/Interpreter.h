@@ -38,6 +38,8 @@ public:
   virtual std::string getOutputFilename(const std::string &filename) = 0;
   virtual llvm::raw_fd_ostream *openOutputFile(const std::string &filename) = 0;
 
+  virtual bool functionInteresting(const llvm::Function* fun) = 0;
+
   virtual void incPathsExplored() = 0;
 
   virtual void processTestCase(const ExecutionState &state,

@@ -1113,7 +1113,8 @@ void Executor::executeCall(ExecutionState &state,
                            KInstruction *ki,
                            Function *f,
                            std::vector< ref<Expr> > &arguments) {
-  state.callPath.push_back(f);
+  if (interpreterHandler->functionInteresting(f))
+    state.callPath.push_back(CallInfo(f, arguments));
 
   Instruction *i = ki->inst;
   if (f && f->isDeclaration()) {
@@ -1377,7 +1378,18 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     if (!isVoidReturn) {
       result = eval(ki, 0, state).value;
     }
-    
+
+    Function* f = ri->getParent()->getParent();
+    if (interpreterHandler->functionInteresting(f)) {
+      assert(f == state.callPath.back().f);
+      state.callPath.back().ret = result;
+      //if (isVoidReturn) {
+      //  state.retPath.push_back(ri->getParent()->getParent()/*result*/);//May be replace by a special indicator?
+      //} else {
+      //  state.retPath.push_back(ri->getParent()->getParent()/*result*/);
+      //}
+    } else {
+    }
     if (state.stack.size() <= 1) {
       assert(!caller && "caller set on initial stack frame");
       terminateStateOnExit(state);
