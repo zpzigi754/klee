@@ -1113,8 +1113,36 @@ void Executor::executeCall(ExecutionState &state,
                            KInstruction *ki,
                            Function *f,
                            std::vector< ref<Expr> > &arguments) {
-  if (interpreterHandler->functionInteresting(f))
-    state.callPath.push_back(CallInfo(f, arguments));
+  if (interpreterHandler->functionInteresting(f)){
+    const FunctionType *fType = 
+      dyn_cast<FunctionType>(cast<PointerType>(f->getType())->getElementType());
+    assert(!fType->isVarArg() && "The interesting functions must not be vararg.");
+    assert(arguments.size() == fType->getNumParams() && "Incorrect call.");
+    int numParams = fType->getNumParams();
+    std::vector< ref<Expr> > args;
+    args.reserve(numParams);
+    for (int i = 0; i < numParams; ++i) {
+      if (fType->getParamType(i)->isPointerTy()) {
+        ref<Expr> address = arguments[i];
+        assert(isa<ConstantExpr>(address) && "No support for symbolic pointers here.");
+        //TODO: check for null pointer.
+        ObjectPair op;
+        bool success = state.addressSpace.resolveOne(cast<ConstantExpr>(address), op);
+        assert(success && "Unknown pointer argument!");
+        const MemoryObject *mo = op.first;
+        const ObjectState *os = op.second;
+        //FIXME: assume inbounds.
+        ref<Expr> offset = mo->getOffsetExpr(address);
+        Expr::Width type =
+          getWidthForLLVMType(( cast<PointerType>(fType->getParamType(i)) )->
+                              getElementType());
+        args.push_back(os->read(offset, type));
+      } else {
+        args.push_back(arguments[i]);
+      }
+    }
+    state.callPath.push_back(CallInfo(f, args));
+  }
 
   Instruction *i = ki->inst;
   if (f && f->isDeclaration()) {
