@@ -549,9 +549,23 @@ void KleeHandler::processCallPath(const ExecutionState &state) {
          end = state.callPath.end(); iter != end; ++iter) {
     const CallInfo& ci = *iter;
     *file << ci.f->getName() <<"(";
-    for (std::vector< ref<Expr> >::const_iterator argIter = ci.args.begin(),
-           end = ci.args.end(); argIter != end; ++argIter)
-      *file << *argIter <<",";
+    for (std::vector< CallArg >::const_iterator argIter = ci.args.begin(),
+           end = ci.args.end(); argIter != end; ++argIter) {
+      const CallArg *arg = &*argIter;
+      if (arg->isPtr) {
+        *file <<"&";
+        if (arg->funPtr == NULL) {
+          *file <<*arg->val;
+          *file <<"->" <<*arg->outVal;
+        } else {
+          *file <<arg->funPtr->getName();
+        }
+      } else {
+        *file <<*arg->expr;
+      }
+      if (argIter+1 != end)
+        *file <<",";
+    }
     *file <<") -> ";
     if (ci.ret.isNull()) {
       *file <<"[]";
