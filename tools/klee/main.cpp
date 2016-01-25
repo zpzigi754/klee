@@ -556,8 +556,8 @@ void KleeHandler::processCallPath(const ExecutionState &state) {
       if (arg->isPtr) {
         *file <<"&";
         if (arg->funPtr == NULL) {
-          *file <<"(" <<*arg->val;
-          *file <<"->" <<*arg->outVal <<")";
+          *file <<"[" <<*arg->val;
+          *file <<"->" <<*arg->outVal <<"]";
         } else {
           *file <<arg->funPtr->getName();
         }
@@ -566,10 +566,18 @@ void KleeHandler::processCallPath(const ExecutionState &state) {
         *file <<",";
     }
     *file <<") -> ";
-    if (ci.ret.isNull()) {
+    if (ci.ret.expr.isNull()) {
       *file <<"[]";
     } else {
-      *file <<*(ci.ret.get());
+      *file <<*ci.ret.expr;
+      if (ci.ret.isPtr) {
+        *file <<"&";
+        if (ci.ret.funPtr == NULL) {
+          *file <<"[" <<*ci.ret.val <<"]";
+        } else {
+          *file <<ci.ret.funPtr->getName();
+        }
+      }
     }
     *file <<"\n";
   }

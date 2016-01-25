@@ -75,10 +75,17 @@ struct CallArg {
   llvm::Function* funPtr;
 };
 
+struct RetVal {
+  ref<Expr> expr;
+  bool isPtr;
+  ref<Expr> val;
+  llvm::Function* funPtr;
+};
+
 struct CallInfo {
   llvm::Function* f;
   std::vector< CallArg > args;
-  ref<Expr> ret;
+  RetVal ret;
 };
 
 /// @brief ExecutionState representing a path under exploration
