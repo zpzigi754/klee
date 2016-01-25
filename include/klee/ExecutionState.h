@@ -65,12 +65,19 @@ struct StackFrame {
   ~StackFrame();
 };
 
+struct CallArg {
+  ref<Expr> expr;
+  ref<Expr> val;
+  bool isPtr;
+  ref<Expr> outVal;
+  Expr::Width outWidth;
+  llvm::Function* funPtr;
+};
+
 struct CallInfo {
   llvm::Function* f;
-  std::vector< ref<Expr> > args;
+  std::vector< CallArg > args;
   ref<Expr> ret;
-  CallInfo(llvm::Function* f_, const std::vector< ref<Expr> > &args_)
-    :f(f_), args(args_), ret() {}
 };
 
 /// @brief ExecutionState representing a path under exploration
