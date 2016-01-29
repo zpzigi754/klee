@@ -234,7 +234,7 @@ private:
   void markByteUnflushed(unsigned offset);
   void setKnownSymbolic(unsigned offset, Expr *value);
 
-  void print();
+  void print() const;
   ArrayCache *getArrayCache() const;
 };
   
