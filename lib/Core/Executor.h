@@ -310,7 +310,7 @@ private:
                    KInstruction *ki,
                    llvm::Function *f,
                    std::vector< ref<Expr> > &arguments);
-                   
+
   // do address resolution / object binding / out of bounds checking
   // and perform the operation
   void executeMemoryOperation(ExecutionState &state,
@@ -540,7 +540,20 @@ public:
   /// Returns the errno location in memory of the state
   int *getErrnoLocation(const ExecutionState &state) const;
 };
-  
-} // End klee namespace
+
+void FillCallInfoInput(llvm::Function* f,
+                       const std::vector< ref<Expr> > &arguments,
+                       const ExecutionState& state,
+                       const Executor& exec,
+                       CallInfo* info);
+
+void FillCallInfoOutput(llvm::Function* f,
+                        bool isVoidReturn,
+                        ref<Expr> result,
+                        const ExecutionState& state,
+                        const Executor& exec,
+                        CallInfo* info);
+
+}// End klee namespace
 
 #endif
