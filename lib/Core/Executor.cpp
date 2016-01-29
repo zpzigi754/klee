@@ -1498,19 +1498,7 @@ void klee::FillCallInfoOutput(Function* f,
   for (int i = 0; i < numParams; ++i) {
     CallArg *arg = &info->args[i];
     if (arg->isPtr && arg->funPtr == NULL) {
-      ref<klee::ConstantExpr> address = cast<klee::ConstantExpr>(arg->expr);
-      ObjectPair op;
-      bool success = state.addressSpace.resolveOne(address, op);
-      assert(success && "Unknown pointer argument!");
-      const MemoryObject *mo = op.first;
-      const ObjectState *os = op.second;
-      klee_message("output mo name: %s, size: %u, id: %u, addr:%lu\n",
-                   mo->name.c_str(), mo->size, mo->id, mo->address);
-      os->print();
-      
-      //FIXME: assume inbounds.
-      ref<Expr> offset = mo->getOffsetExpr(address);
-      info->args[i].outVal = os->read(offset, arg->outWidth);
+      info->args[i].outVal = readMemoryChunk(arg->expr, arg->outWidth, state);
     }
   }
 }
