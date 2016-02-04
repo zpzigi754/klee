@@ -160,6 +160,19 @@ extern "C" {
 
   /* Get errno value of the current state */
   int klee_get_errno(void);
+
+#define KLEE_TRACE_PARAM_PROTO(suffix, type) \
+  void klee_trace_param##suffix(type param, const char* name)
+  KLEE_TRACE_PARAM_PROTO(f, float);
+  KLEE_TRACE_PARAM_PROTO(d, double);
+  KLEE_TRACE_PARAM_PROTO(l, long);
+  KLEE_TRACE_PARAM_PROTO(ll, long long);
+  KLEE_TRACE_PARAM_PROTO(_i32, int32_t);
+  KLEE_TRACE_PARAM_PROTO(_i64, int64_t);
+#undef KLEE_TRACE_PARAM_PROTO
+  void klee_trace_param_ptr(void* ptr, int width, const char* name);
+  void klee_trace_param_fptr(void* ptr, const char* name);
+  void klee_trace_ret();
 #ifdef __cplusplus
 }
 #endif

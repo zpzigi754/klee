@@ -389,3 +389,53 @@ void ExecutionState::dumpStack(llvm::raw_ostream &out) const {
     target = sf.caller;
   }
 }
+
+ref<Expr> ExecutionState::readMemoryChunk(ref<Expr> addr,
+                                          Expr::Width width) const {
+  ObjectPair op;
+  ref<klee::ConstantExpr> address = cast<klee::ConstantExpr>(addr);
+  bool success = addressSpace.resolveOne(address, op);
+  assert(success && "Unknown pointer result!");
+  const MemoryObject *mo = op.first;
+  const ObjectState *os = op.second;
+  //FIXME: assume inbounds.
+  ref<Expr> offset = mo->getOffsetExpr(address);
+  return os->read(offset, width);
+}
+
+void ExecutionState::TraceRet() {
+  if (callPath.empty() ||
+      callPath.back().f != stack.back().kf->function) {
+    callPath.push_back(CallInfo());
+    callPath.back().f = stack.back().kf->function;
+  }
+}
+
+void ExecutionState::TraceArgValue(ref<Expr> val, std::string name) {
+  TraceRet();
+  callPath.back().args.push_back(CallArg());
+  CallArg *argInfo = &callPath.back().args.back();
+  argInfo->expr = val;
+  argInfo->isPtr = false;
+  argInfo->name = name;
+}
+
+void ExecutionState::TraceArgPtr(ref<Expr> arg, Expr::Width width,
+                                 std::string name) {
+  TraceArgValue(arg, name);
+  CallArg *argInfo = &callPath.back().args.back();
+  argInfo->isPtr = true;
+  argInfo->outWidth = width;
+  argInfo->funPtr = NULL;
+  argInfo->val = readMemoryChunk(arg, width);
+}
+
+void ExecutionState::TraceArgFunPtr(ref<Expr> arg,
+                                    std::string name) {
+  TraceArgValue(arg, name);
+  CallArg *argInfo = &callPath.back().args.back();
+  argInfo->isPtr = true;
+  ref<klee::ConstantExpr> address = cast<klee::ConstantExpr>(arg);
+  argInfo->funPtr = (Function*)address->getZExtValue();
+}
+
