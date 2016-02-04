@@ -79,6 +79,7 @@ struct CallArg {
 struct RetVal {
   ref<Expr> expr;
   bool isPtr;
+  Expr::Width width;
   ref<Expr> val;
   llvm::Function* funPtr;
 };
@@ -213,6 +214,7 @@ public:
   void TraceArgFunPtr(ref<Expr> arg,
                       std::string name);
   void TraceRet();
+  void TraceRetPtr(Expr::Width width);
 };
 }
 #endif
