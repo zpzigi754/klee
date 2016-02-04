@@ -594,6 +594,11 @@ void KleeHandler::processCallPath(const ExecutionState &state) {
     }
     *file <<"\n";
   }
+  *file <<";;-- Constraints --\n";
+  for (ConstraintManager::constraint_iterator ci = state.constraints.begin(),
+         cEnd = state.constraints.end(); ci != cEnd; ++ci) {
+    *file <<**ci<<"\n";
+  }
   delete file;
 }
 
