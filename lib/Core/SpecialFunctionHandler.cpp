@@ -122,6 +122,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_trace_param_ptr", handleTraceParamPtr, false),
   add("klee_trace_param_fptr", handleTraceParamFPtr, false),
   add("klee_trace_ret", handleTraceRet, false),
+  add("klee_trace_ret_ptr", handleTraceRetPtr, false),
 
   // operator delete[](void*)
   add("_ZdaPv", handleDeleteArray, false),
@@ -869,6 +870,13 @@ void SpecialFunctionHandler::handleTraceRet(ExecutionState &state,
                                             KInstruction *target,
                                             std::vector<ref<Expr> > &arguments) {
   state.TraceRet();
+}
+
+void SpecialFunctionHandler::handleTraceRetPtr(ExecutionState &state,
+                                               KInstruction *target,
+                                               std::vector<ref<Expr> > &arguments) {
+  Expr::Width width = (cast<klee::ConstantExpr>(arguments[0]))->getZExtValue();
+  state.TraceRetPtr(width);
 }
 
 void SpecialFunctionHandler::handleTraceParam(ExecutionState &state,
