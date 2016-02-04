@@ -541,11 +541,11 @@ public:
   int *getErrnoLocation(const ExecutionState &state) const;
 };
 
-void FillCallInfoInput(llvm::Function* f,
-                       const std::vector< ref<Expr> > &arguments,
-                       const ExecutionState& state,
-                       const Executor& exec,
-                       CallInfo* info);
+  //void FillCallInfoInput(llvm::Function* f,
+  //                      const std::vector< ref<Expr> > &arguments,
+  //                      const ExecutionState& state,
+  //                     const Executor& exec,
+  //                     CallInfo* info);
 
 void FillCallInfoOutput(llvm::Function* f,
                         bool isVoidReturn,

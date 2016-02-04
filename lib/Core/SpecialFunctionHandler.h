@@ -139,6 +139,10 @@ namespace klee {
     HANDLER(handleMulOverflow);
     HANDLER(handleSubOverflow);
     HANDLER(handleDivRemOverflow);
+    HANDLER(handleTraceParam);
+    HANDLER(handleTraceParamPtr);
+    HANDLER(handleTraceParamFPtr);
+    HANDLER(handleTraceRet);
 #undef HANDLER
   };
 } // End klee namespace
