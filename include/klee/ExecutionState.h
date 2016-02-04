@@ -72,6 +72,7 @@ struct CallArg {
   ref<Expr> outVal;
   Expr::Width outWidth;
   llvm::Function* funPtr;
+  std::string name;
 };
 
 struct RetVal {
@@ -197,6 +198,14 @@ public:
 
   bool merge(const ExecutionState &b);
   void dumpStack(llvm::raw_ostream &out) const;
+  ref<Expr> readMemoryChunk(ref<Expr> addr,
+                            Expr::Width width) const;
+  void TraceArgValue(ref<Expr> val, std::string name);
+  void TraceArgPtr(ref<Expr> arg, Expr::Width width,
+                   std::string name);
+  void TraceArgFunPtr(ref<Expr> arg,
+                      std::string name);
+  void TraceRet();
 };
 }
 #endif

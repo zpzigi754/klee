@@ -1109,19 +1109,7 @@ void Executor::stepInstruction(ExecutionState &state) {
     haltExecution = true;
 }
 
-ref<Expr> readMemoryChunk(ref<Expr> addr, Expr::Width width,
-                          const ExecutionState& state) {
-  ObjectPair op;
-  ref<klee::ConstantExpr> address = cast<klee::ConstantExpr>(addr);
-  bool success = state.addressSpace.resolveOne(address, op);
-  assert(success && "Unknown pointer result!");
-  const MemoryObject *mo = op.first;
-  const ObjectState *os = op.second;
-  //FIXME: assume inbounds.
-  ref<Expr> offset = mo->getOffsetExpr(address);
-  return os->read(offset, width);
-}
-
+#if 0
 void klee::FillCallInfoInput(Function* f,
                              const std::vector< ref<Expr> > &arguments,
                              const ExecutionState& state,
@@ -1182,6 +1170,7 @@ void klee::FillCallInfoInput(Function* f,
     }
   }
 }
+#endif//0
 
 void Executor::executeCall(ExecutionState &state, 
                            KInstruction *ki,
@@ -1258,12 +1247,13 @@ void Executor::executeCall(ExecutionState &state,
     state.pushFrame(state.prevPC, kf);
     state.pc = kf->instructions;
 
+#if 0
     if (interpreterHandler->functionInteresting(f)){
       state.callPath.push_back(CallInfo());
       CallInfo *info = &state.callPath.back();
       FillCallInfoInput(f, arguments, state, *this, info);
     }
-
+#endif//0
     if (statsTracker)
       statsTracker->framePushed(state, &state.stack[state.stack.size()-2]);
  
@@ -1464,9 +1454,8 @@ void klee::FillCallInfoOutput(Function* f,
         uint64_t addr = address->getZExtValue();
         info->ret.funPtr = (Function*) addr;
       } else {
-        info->ret.val = readMemoryChunk(address,
-                                        exec.getWidthForLLVMType(elementType),
-                                        state);
+        info->ret.val = state.readMemoryChunk(address,
+                                              exec.getWidthForLLVMType(elementType));
         info->ret.funPtr = NULL;
       }
     }
@@ -1488,7 +1477,7 @@ void klee::FillCallInfoOutput(Function* f,
                                   exec.getWidthForLLVMType(sizeType)) );
       Expr::Width width = 8*rezS->getZExtValue();
       info->ret.isPtr = true;
-      info->ret.val = readMemoryChunk(rezP, width, state);
+      info->ret.val = state.readMemoryChunk(rezP, width);
       info->ret.funPtr = NULL;
       info->ret.expr = rezP;
     }
@@ -1498,7 +1487,7 @@ void klee::FillCallInfoOutput(Function* f,
   for (int i = 0; i < numParams; ++i) {
     CallArg *arg = &info->args[i];
     if (arg->isPtr && arg->funPtr == NULL) {
-      info->args[i].outVal = readMemoryChunk(arg->expr, arg->outWidth, state);
+      info->args[i].outVal = state.readMemoryChunk(arg->expr, arg->outWidth);
     }
   }
 }
@@ -1519,8 +1508,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     }
 
     Function* f = ri->getParent()->getParent();
-    if (interpreterHandler->functionInteresting(f)) {
-      assert(f == state.callPath.back().f);
+    //if (interpreterHandler->functionInteresting(f)) {
+    if (!state.callPath.empty() && f == state.callPath.back().f) {
+      //FIXME: check that there are no nested "interesting functions".
       CallInfo *info = &state.callPath.back();
       FillCallInfoOutput(f, isVoidReturn, result, state, *this, info);
     }

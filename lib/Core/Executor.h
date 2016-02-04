@@ -474,11 +474,11 @@ public:
   Expr::Width getWidthForLLVMType(LLVM_TYPE_Q llvm::Type *type) const;
 };
 
-void FillCallInfoInput(llvm::Function* f,
-                       const std::vector< ref<Expr> > &arguments,
-                       const ExecutionState& state,
-                       const Executor& exec,
-                       CallInfo* info);
+  //void FillCallInfoInput(llvm::Function* f,
+  //                      const std::vector< ref<Expr> > &arguments,
+  //                      const ExecutionState& state,
+  //                     const Executor& exec,
+  //                     CallInfo* info);
 
 void FillCallInfoOutput(llvm::Function* f,
                         bool isVoidReturn,

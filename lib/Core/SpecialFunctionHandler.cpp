@@ -7,6 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <llvm/IR/Instructions.h>
 #include "Memory.h"
 #include "SpecialFunctionHandler.h"
 #include "TimingSolver.h"
@@ -108,6 +109,15 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_alias_function", handleAliasFunction, false),
   add("malloc", handleMalloc, true),
   add("realloc", handleRealloc, true),
+  add("klee_trace_paramf", handleTraceParam, false),
+  add("klee_trace_paramd", handleTraceParam, false),
+  add("klee_trace_paraml", handleTraceParam, false),
+  add("klee_trace_paramll", handleTraceParam, false),
+  add("klee_trace_param_i32", handleTraceParam, false),
+  add("klee_trace_param_i64", handleTraceParam, false),
+  add("klee_trace_param_ptr", handleTraceParamPtr, false),
+  add("klee_trace_param_fptr", handleTraceParamFPtr, false),
+  add("klee_trace_ret", handleTraceRet, false),
 
   // operator delete[](void*)
   add("_ZdaPv", handleDeleteArray, false),
@@ -773,4 +783,33 @@ void SpecialFunctionHandler::handleDivRemOverflow(ExecutionState &state,
   executor.terminateStateOnError(state,
                                  "overflow on division or remainder",
                                  "overflow.err");
+}
+
+void SpecialFunctionHandler::handleTraceRet(ExecutionState &state,
+                                            KInstruction *target,
+                                            std::vector<ref<Expr> > &arguments) {
+  state.TraceRet();
+}
+
+void SpecialFunctionHandler::handleTraceParam(ExecutionState &state,
+                                              KInstruction *target,
+                                              std::vector<ref<Expr> > &arguments) {
+  std::string name = readStringAtAddress(state, arguments[1]);
+  state.TraceArgValue(arguments[0], name);
+}
+
+void SpecialFunctionHandler::handleTraceParamPtr(ExecutionState &state,
+                                                 KInstruction *target,
+                                                 std::vector<ref<Expr> > &arguments) {
+  assert(isa<klee::ConstantExpr>(arguments[1]) && "Width must be a static constant.");
+  Expr::Width width = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
+  width = width * 8;//Convert to bits.
+  std::string name = readStringAtAddress(state, arguments[2]);
+  state.TraceArgPtr(arguments[0], width, name);
+}
+void SpecialFunctionHandler::handleTraceParamFPtr(ExecutionState &state,
+                                              KInstruction *target,
+                                              std::vector<ref<Expr> > &arguments) {
+  std::string name = readStringAtAddress(state, arguments[1]);
+  state.TraceArgFunPtr(arguments[0], name);
 }
