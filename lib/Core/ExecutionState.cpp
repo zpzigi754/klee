@@ -404,6 +404,13 @@ void ExecutionState::TraceRet() {
   }
 }
 
+void ExecutionState::TraceRetPtr(Expr::Width width) {
+  TraceRet();
+  RetVal *ret = &callPath.back().ret;
+  ret->isPtr = true;
+  ret->width = width;
+}
+
 void ExecutionState::TraceArgValue(ref<Expr> val, std::string name) {
   TraceRet();
   callPath.back().args.push_back(CallArg());

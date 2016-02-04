@@ -167,6 +167,7 @@ extern "C" {
   void klee_trace_param_ptr(void* ptr, int width, const char* name);
   void klee_trace_param_fptr(void* ptr, const char* name);
   void klee_trace_ret();
+  void klee_trace_ret_ptr(int width);
 #ifdef __cplusplus
 }
 #endif
