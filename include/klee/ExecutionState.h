@@ -88,6 +88,7 @@ struct CallInfo {
   llvm::Function* f;
   std::vector< CallArg > args;
   RetVal ret;
+  bool returned;
 };
 
 /// @brief ExecutionState representing a path under exploration
