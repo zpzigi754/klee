@@ -399,8 +399,11 @@ ref<Expr> ExecutionState::readMemoryChunk(ref<Expr> addr,
 void ExecutionState::TraceRet() {
   if (callPath.empty() ||
       callPath.back().f != stack.back().kf->function) {
+    assert((callPath.empty() || callPath.back().returned) &&
+           "Nested traced functions are not supported.");
     callPath.push_back(CallInfo());
     callPath.back().f = stack.back().kf->function;
+    callPath.back().returned = false;
   }
 }
 

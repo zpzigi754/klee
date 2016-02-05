@@ -1420,6 +1420,8 @@ void klee::FillCallInfoOutput(Function* f,
       info->args[i].outVal = state.readMemoryChunk(arg->expr, arg->outWidth);
     }
   }
+
+  info->returned = true;
 }
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
@@ -1439,7 +1441,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
     Function* f = ri->getParent()->getParent();
     if (!state.callPath.empty() && f == state.callPath.back().f) {
-      //FIXME: check that there are no nested "interesting functions".
       CallInfo *info = &state.callPath.back();
       FillCallInfoOutput(f, isVoidReturn, result, state, *this, info);
     }
