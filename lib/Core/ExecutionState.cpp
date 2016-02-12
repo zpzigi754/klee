@@ -396,7 +396,7 @@ ref<Expr> ExecutionState::readMemoryChunk(ref<Expr> addr,
   return os->read(offset, width);
 }
 
-void ExecutionState::TraceRet() {
+void ExecutionState::traceRet() {
   if (callPath.empty() ||
       callPath.back().f != stack.back().kf->function) {
     assert((callPath.empty() || callPath.back().returned) &&
@@ -407,15 +407,15 @@ void ExecutionState::TraceRet() {
   }
 }
 
-void ExecutionState::TraceRetPtr(Expr::Width width) {
-  TraceRet();
+void ExecutionState::traceRetPtr(Expr::Width width) {
+  traceRet();
   RetVal *ret = &callPath.back().ret;
   ret->isPtr = true;
   ret->width = width;
 }
 
-void ExecutionState::TraceArgValue(ref<Expr> val, std::string name) {
-  TraceRet();
+void ExecutionState::traceArgValue(ref<Expr> val, std::string name) {
+  traceRet();
   callPath.back().args.push_back(CallArg());
   CallArg *argInfo = &callPath.back().args.back();
   argInfo->expr = val;
@@ -423,9 +423,9 @@ void ExecutionState::TraceArgValue(ref<Expr> val, std::string name) {
   argInfo->name = name;
 }
 
-void ExecutionState::TraceArgPtr(ref<Expr> arg, Expr::Width width,
+void ExecutionState::traceArgPtr(ref<Expr> arg, Expr::Width width,
                                  std::string name) {
-  TraceArgValue(arg, name);
+  traceArgValue(arg, name);
   CallArg *argInfo = &callPath.back().args.back();
   argInfo->isPtr = true;
   argInfo->outWidth = width;
@@ -433,12 +433,56 @@ void ExecutionState::TraceArgPtr(ref<Expr> arg, Expr::Width width,
   argInfo->val = readMemoryChunk(arg, width);
 }
 
-void ExecutionState::TraceArgFunPtr(ref<Expr> arg,
+void ExecutionState::traceArgFunPtr(ref<Expr> arg,
                                     std::string name) {
-  TraceArgValue(arg, name);
+  traceArgValue(arg, name);
   CallArg *argInfo = &callPath.back().args.back();
   argInfo->isPtr = true;
   ref<klee::ConstantExpr> address = cast<klee::ConstantExpr>(arg);
   argInfo->funPtr = (Function*)address->getZExtValue();
 }
 
+void ExecutionState::traceArgPtrField(ref<Expr> arg,
+                                      int offset,
+                                      Expr::Width width,
+                                      std::string name) {
+  assert(!callPath.empty() &&
+         callPath.back().f == stack.back().kf->function &&
+         "Must trace the function first to trace a particular field.");
+  CallArg *argInfo = callPath.back().getCallArgPtrp(arg);
+  assert(argInfo != 0 &&
+         "Must first trace the pointer arg to trace a particular field.");
+  assert(argInfo->outWidth > 0 && "Cannot fit a field into zero bytes.");
+  assert(argInfo->fields.count(offset) == 0 && "Conflicting field.");
+  FieldDescr descr;
+  descr.width = width;
+  descr.name = name;
+  size_t base = (cast<ConstantExpr>(arg))->getZExtValue();
+  ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + offset, sizeof(size_t)*8);
+  descr.inVal = readMemoryChunk(addrExpr, width);
+  argInfo->fields[offset] = descr;
+}
+
+void ExecutionState::traceRetPtrField(int offset,
+                                      Expr::Width width,
+                                      std::string name) {
+  assert(!callPath.empty() &&
+         callPath.back().f == stack.back().kf->function &&
+         "Must trace the function first to trace a particular field.");
+  RetVal *ret = &callPath.back().ret;
+  assert(ret->isPtr && "Only a pointer can have fields traced.");
+  assert(ret->width > 0 && "Cannot fit a field in zero sized mem chunk.");
+  assert(ret->fields.count(offset) == 0 && "Fields conflict");
+  FieldDescr descr;
+  descr.width = width;
+  descr.name = name;
+  ret->fields[offset] = descr;
+}
+
+CallArg* CallInfo::getCallArgPtrp(ref<Expr> ptr) {
+  for (unsigned i = 0; i < args.size(); ++i) {
+    CallArg *cur = &args[i];
+    if (cur->isPtr && cur->expr->compare(*ptr) == 0) return cur;
+  }
+  return 0;
+}

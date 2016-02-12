@@ -65,6 +65,13 @@ struct StackFrame {
   ~StackFrame();
 };
 
+struct FieldDescr {
+  Expr::Width width;
+  std::string name;
+  ref<Expr> inVal;
+  ref<Expr> outVal;
+};
+
 struct CallArg {
   ref<Expr> expr;
   ref<Expr> val;
@@ -73,6 +80,7 @@ struct CallArg {
   Expr::Width outWidth;
   llvm::Function* funPtr;
   std::string name;
+  std::map<int, FieldDescr> fields;
 };
 
 struct RetVal {
@@ -81,6 +89,7 @@ struct RetVal {
   Expr::Width width;
   ref<Expr> val;
   llvm::Function* funPtr;
+  std::map<int, FieldDescr> fields;
 };
 
 struct CallInfo {
@@ -88,6 +97,7 @@ struct CallInfo {
   std::vector< CallArg > args;
   RetVal ret;
   bool returned;
+  CallArg* getCallArgPtrp(ref<Expr> ptr);
 };
 
 /// @brief ExecutionState representing a path under exploration
@@ -202,13 +212,16 @@ public:
   void dumpStack(llvm::raw_ostream &out) const;
   ref<Expr> readMemoryChunk(ref<Expr> addr,
                             Expr::Width width) const;
-  void TraceArgValue(ref<Expr> val, std::string name);
-  void TraceArgPtr(ref<Expr> arg, Expr::Width width,
+  void traceArgValue(ref<Expr> val, std::string name);
+  void traceArgPtr(ref<Expr> arg, Expr::Width width,
                    std::string name);
-  void TraceArgFunPtr(ref<Expr> arg,
+  void traceArgFunPtr(ref<Expr> arg,
                       std::string name);
-  void TraceRet();
-  void TraceRetPtr(Expr::Width width);
+  void traceRet();
+  void traceRetPtr(Expr::Width width);
+  void traceArgPtrField(ref<Expr> arg, int offset,
+                        Expr::Width width, std::string name);
+  void traceRetPtrField(int offset, Expr::Width width, std::string name);
 };
 }
 #endif
