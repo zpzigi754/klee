@@ -486,10 +486,88 @@ void ExecutionState::traceRetPtrField(int offset,
   ret->fields[offset] = descr;
 }
 
+bool FieldDescr::eq(const FieldDescr& other) const {
+  return width == other.width &&
+    name == other.name &&
+    (inVal.isNull() ? other.inVal.isNull() :
+     (!other.inVal.isNull()) && 0 == inVal->compare(*other.inVal)) &&
+    (outVal.isNull() ? other.outVal.isNull() :
+     (!other.outVal.isNull()) && 0 == outVal->compare(*other.outVal));
+}
+
+bool CallArg::eq(const CallArg& other) const {
+  if (fields.size() != other.fields.size()) return false;
+  std::map<int, FieldDescr>::const_iterator i = fields.begin(),
+    e = fields.end();
+  for (; i != e; ++i) {
+    std::map<int, FieldDescr>::const_iterator it = other.fields.find(i->first);
+    if (it == other.fields.end() || !it->second.eq(i->second)) return false;
+  }
+  return (expr.isNull() ? other.expr.isNull() :
+          (!other.expr.isNull()) && 0 == expr->compare(*other.expr)) &&
+    (val.isNull() ? other.val.isNull() :
+     (!other.val.isNull()) && 0 == val->compare(*other.val)) &&
+    isPtr == other.isPtr &&
+    (outVal.isNull() ? other.outVal.isNull() :
+     (!other.outVal.isNull()) && 0 == outVal->compare(*other.outVal)) &&
+    outWidth == other.outWidth &&
+    funPtr == other.funPtr &&
+    name == other.name;
+}
+
+bool CallArg::sameInvocationValue(const CallArg& other) const {
+  return (expr.isNull() ? other.expr.isNull() :
+          (!other.expr.isNull()) && 0 == expr->compare(*other.expr)) &&
+    name == other.name &&
+    (isPtr ?
+     (other.isPtr && !val.isNull() && !other.val.isNull() &&
+      0 == val->compare(*other.val) &&
+      outWidth == other.outWidth &&
+      funPtr == other.funPtr) :
+     !other.isPtr);
+}
+
+bool RetVal::eq(const RetVal& other) const {
+  if (fields.size() != other.fields.size()) return false;
+  std::map<int, FieldDescr>::const_iterator i = fields.begin(),
+    e = fields.end();
+  for (; i != e; ++i) {
+    std::map<int, FieldDescr>::const_iterator it = other.fields.find(i->first);
+    if (it == other.fields.end() || !it->second.eq(i->second)) return false;
+  }
+  return (expr.isNull() ? other.expr.isNull() :
+          (!other.expr.isNull()) && 0 == expr->compare(*other.expr)) &&
+    isPtr == other.isPtr &&
+    width == other.width &&
+    (val.isNull() ? other.val.isNull() :
+     (!other.val.isNull()) && 0 == val->compare(*other.val)) &&
+    funPtr == other.funPtr;
+}
+
 CallArg* CallInfo::getCallArgPtrp(ref<Expr> ptr) {
   for (unsigned i = 0; i < args.size(); ++i) {
     CallArg *cur = &args[i];
-    if (cur->isPtr && cur->expr->compare(*ptr) == 0) return cur;
+    if (cur->isPtr && 0 == cur->expr->compare(*ptr)) return cur;
   }
   return 0;
+}
+
+bool CallInfo::eq(const CallInfo& other) const {
+  if (args.size() != other.args.size()) return false;
+  for (unsigned i = 0; i < args.size(); ++i) {
+    if (!args[i].eq(other.args[i])) return false;
+  }
+  return f == other.f &&
+    ret.eq(other.ret) &&
+    returned == other.returned;
+}
+
+bool CallInfo::sameInvocation(const CallInfo* other) const {
+  //TODO: compare assumptions as well.
+  if (args.size() != other->args.size()) return false;
+  if (f != other->f) return false;
+  for (unsigned i = 0; i < args.size(); ++i) {
+    if (!args[i].sameInvocationValue(other->args[i])) return false;
+  }
+  return true;
 }

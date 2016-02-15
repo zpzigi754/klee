@@ -56,6 +56,8 @@
 #include <iomanip>
 #include <iterator>
 #include <sstream>
+#include <list>
+#include <iostream>
 
 
 using namespace llvm;
@@ -211,6 +213,24 @@ namespace {
 
 extern cl::opt<double> MaxTime;
 
+class KleeHandler;
+
+class CallTree {
+  std::vector<CallTree* > children;
+  CallInfo call;
+  ConstraintManager context;//TODO: this should be present already in the CallInfo.
+  std::vector<std::vector<CallInfo*> > groupChildren();
+public:
+  CallTree():children(), call(), context(){};
+  void addCallPath(std::vector<CallInfo>::const_iterator path_begin,
+                   std::vector<CallInfo>::const_iterator path_end,
+                   const ConstraintManager& constraints);
+  void dumpCallPrefixes(std::list<CallInfo> accumulated_prefix,
+                        KleeHandler* fileOpener);
+
+  int refCount;
+};
+
 /***/
 
 class KleeHandler : public InterpreterHandler {
@@ -225,10 +245,13 @@ private:
   unsigned m_numGeneratedTests; // Number of tests successfully generated
   unsigned m_pathsExplored; // number of paths explored so far
   unsigned m_callPathIndex; // number of call path strings dumped so far
+  unsigned m_callPathPrefixIndex; // number of call path strings dumped so far
 
   // used for writing .ktest files
   int m_argc;
   char **m_argv;
+
+  CallTree m_callTree;
 
 public:
   KleeHandler(int argc, char **argv);
@@ -260,12 +283,15 @@ public:
                                  std::vector<std::string> &results);
 
   static std::string getRunTimeLibraryPath(const char *argv0);
+  llvm::raw_fd_ostream  *openNextCallPathPrefixFile();
+
+  void dumpCallPathPrefixes();
 };
 
 KleeHandler::KleeHandler(int argc, char **argv)
     : m_interpreter(0), m_pathWriter(0), m_symPathWriter(0), m_infoFile(0),
       m_outputDirectory(), m_numTotalTests(0), m_numGeneratedTests(0),
-      m_pathsExplored(0), m_callPathIndex(0), m_argc(argc), m_argv(argv) {
+      m_pathsExplored(0), m_callPathIndex(0), m_callPathPrefixIndex(0), m_argc(argc), m_argv(argv) {
 
   // create output directory (OutputDir or "klee-out-<i>")
   bool dir_given = OutputDir != "";
@@ -526,6 +552,7 @@ void KleeHandler::processTestCase(const ExecutionState &state,
 }
 
 void KleeHandler::processCallPath(const ExecutionState &state) {
+  m_callTree.addCallPath(state.callPath.begin(), state.callPath.end(), state.constraints);
   unsigned id = ++m_callPathIndex;
   std::stringstream filename;
   filename << "call-path" << std::setfill('0') << std::setw(6) << id << '.' << "txt";
@@ -585,6 +612,18 @@ void KleeHandler::processCallPath(const ExecutionState &state) {
   }
   delete file;
 }
+
+llvm::raw_fd_ostream *KleeHandler::openNextCallPathPrefixFile() {
+  unsigned id = ++m_callPathPrefixIndex;
+  std::stringstream filename;
+  filename << "call-prefix" << std::setfill('0') << std::setw(6) << id << '.' << "txt";
+  return openOutputFile(filename.str());
+}
+
+void KleeHandler::dumpCallPathPrefixes() {
+  m_callTree.dumpCallPrefixes(std::list<CallInfo>(), this);
+}
+
 
   // load a .path file
 void KleeHandler::loadPathFile(std::string name,
@@ -665,6 +704,224 @@ std::string KleeHandler::getRunTimeLibraryPath(const char *argv0) {
                        libDir.c_str() << "\n");
   return libDir.str();
 }
+
+void CallTree::addCallPath(std::vector<CallInfo>::const_iterator path_begin,
+                           std::vector<CallInfo>::const_iterator path_end,
+                           const ConstraintManager& constraints) {
+  //TODO: do we process constraints (what if they are different from the old ones?)
+  //TODO: record assumptions for each item in the call-path, because, when
+  // comparing two paths in the tree they may differ only by the assumptions.
+  if (path_begin == path_end) return;
+  std::vector<CallInfo>::const_iterator next = path_begin;
+  ++next;
+  std::vector<CallTree*>::iterator i = children.begin(), ie = children.end();
+  for (; i!=ie; ++i) {
+    if ((*i)->call.eq(*path_begin)) {
+      (*i)->addCallPath(next, path_end, constraints);
+      return;
+    }
+  }
+  children.push_back(new CallTree());
+  CallTree* n = children.back();
+  n->call = *path_begin;
+  n->context = constraints;
+  n->addCallPath(next, path_end, constraints);
+}
+
+void dumpCallInfo(const CallInfo& ci, llvm::raw_ostream& file) {
+  file << ci.f->getName() <<"(";
+  for (std::vector< CallArg >::const_iterator argIter = ci.args.begin(),
+         end = ci.args.end(); argIter != end; ++argIter) {
+    const CallArg *arg = &*argIter;
+    file <<arg->name <<":";
+    file <<*arg->expr;
+    if (arg->isPtr) {
+      file <<"&";
+      if (arg->funPtr == NULL) {
+        file <<"[" <<*arg->val;
+        file <<"->" <<*arg->outVal <<"]";
+        std::map<int, FieldDescr>::const_iterator i = arg->fields.begin(),
+            e = arg->fields.end();
+        for (; i != e; ++i) {
+          file <<"[" <<i->second.name <<":" <<*i->second.inVal << "->";
+          file <<*i->second.outVal <<"]";
+        }
+      } else {
+        file <<arg->funPtr->getName();
+      }
+    }
+    if (argIter+1 != end)
+      file <<",";
+  }
+  file <<") -> ";
+  if (ci.ret.expr.isNull()) {
+    file <<"[]";
+  } else {
+    file <<*ci.ret.expr;
+    if (ci.ret.isPtr) {
+      file <<"&";
+      if (ci.ret.funPtr == NULL) {
+        file <<"[" <<*ci.ret.val <<"]";
+        std::map<int, FieldDescr>::const_iterator i = ci.ret.fields.begin(),
+          e = ci.ret.fields.end();
+        for (; i != e; ++i) {
+          file <<"[" <<i->second.name <<":" <<*i->second.outVal << "]";
+        }
+      } else {
+        file <<ci.ret.funPtr->getName();
+      }
+    }
+  }
+  file <<"\n";
+}
+
+std::vector<std::vector<CallInfo*> > CallTree::groupChildren() {
+  std::vector<std::vector<CallInfo*> > ret;
+  for (unsigned ci = 0; ci < children.size(); ++ci) {
+    CallInfo* current = &children[ci]->call;
+    bool groupNotFound = true;
+    for (unsigned gi = 0; gi < ret.size(); ++gi) {
+      if (current->sameInvocation(ret[gi][0])) {
+        ret[gi].push_back(current);
+        groupNotFound = false;
+        break;
+      }
+    }
+    if (groupNotFound) {
+      ret.push_back(std::vector<CallInfo*>());
+      ret.back().push_back(current);
+    }
+  }
+  return ret;
+}
+
+void dumpCallGroup(const std::vector<CallInfo*> group, llvm::raw_ostream& file) {
+  std::vector<CallInfo*>::const_iterator gi = group.begin(), ge = group.end();
+  file << (**gi).f->getName() <<"(";
+  for (unsigned argI = 0; argI < (**gi).args.size(); ++argI) {
+    const CallArg& arg = (**gi).args[argI];
+    file <<arg.name <<":";
+    file <<*arg.expr;
+    if (arg.isPtr) {
+      file <<"&";
+      if (arg.funPtr != NULL) {
+        file <<arg.funPtr->getName();
+      } else {
+        file <<"[" <<arg.val <<"->";
+        for (; gi != ge; ++gi) {
+          file <<*(**gi).args[argI].outVal <<"; ";
+        }
+        file <<"]";
+        gi = group.begin();
+        unsigned numFields = arg.fields.size();
+        for (; gi != ge; ++gi) {
+          assert((**gi).args[argI].fields.size() == numFields &&
+                 "Do not support variating the argument structure for different"
+                 " calls of the same function.");
+        }
+        gi = group.begin();
+        std::map<int, FieldDescr>::const_iterator fi = arg.fields.begin(),
+          fe = arg.fields.end();
+        for (; fi != fe; ++fi) {
+          int fieldOffset = fi->first;
+          const FieldDescr& descr = fi->second;
+          file <<"[" <<descr.name <<":" <<*descr.inVal << "->";
+          for (; gi != ge; ++gi) {
+            std::map<int, FieldDescr>::const_iterator otherDescrI =
+              (**gi).args[argI].fields.find(fieldOffset);
+            assert(otherDescrI != (**gi).args[argI].fields.end() &&
+                   "The argument structure is different.");
+            file <<*otherDescrI->second.outVal <<";";
+          }
+          file <<"]";
+          gi = group.begin();
+        }
+      }
+    }
+  }
+  file <<") ->";
+  const RetVal& ret = (**gi).ret;
+  if (ret.expr.isNull()) {
+    for (; gi != ge; ++gi) {
+      assert((**gi).ret.expr.isNull() &&
+             "Do not support different return"
+             " behaviours for the same function.");
+    }
+    gi = group.begin();
+    file <<"[]";
+  } else {
+    if (ret.isPtr) {
+      for (; gi != ge; ++gi) {
+        assert((**gi).ret.isPtr &&
+               "Do not support different return"
+               " behaviours for the same function.");
+      }
+      gi = group.begin();
+      file <<"&";
+      if (ret.funPtr != NULL) {
+        for (; gi != ge; ++gi) {
+          assert((**gi).ret.funPtr != NULL &&
+                 "Do not support different return"
+                 " behaviours for the same function.");
+          file <<(**gi).ret.funPtr->getName() <<";";
+        }
+        gi = group.begin();
+      } else {
+        for (; gi != ge; ++gi) {
+          file <<*(**gi).ret.val <<";";
+        }
+        gi = group.begin();
+        std::map<int, FieldDescr>::const_iterator fi = ret.fields.begin(),
+          fe = ret.fields.end();
+        for (; fi != fe; ++fi) {
+          int fieldOffset = fi->first;
+          const FieldDescr& descr = fi->second;
+          file <<"[" <<descr.name <<":";
+          for (; gi != ge; ++gi) {
+            std::map<int, FieldDescr>::const_iterator otherDescrI =
+              (**gi).ret.fields.find(fieldOffset);
+            assert(otherDescrI != (**gi).ret.fields.end() &&
+                   "The return structure is different.");
+            file <<*otherDescrI->second.outVal <<";";
+          }
+          file <<"]";
+          gi = group.begin();
+        }
+      }
+    } else {
+      for (; gi != ge; ++gi) {
+        file <<(**gi).ret.expr <<";";
+      }
+    }
+  }
+  file <<"\n";
+}
+
+void CallTree::dumpCallPrefixes(std::list<CallInfo> accumulated_prefix,
+                                  KleeHandler* fileOpener) {
+  std::vector<std::vector<CallInfo*> > tipCalls = groupChildren();
+  std::vector<std::vector<CallInfo*> >::iterator ti = tipCalls.begin(),
+    te = tipCalls.end();
+  for (; ti != te; ++ti) {
+    llvm::raw_ostream* file = fileOpener->openNextCallPathPrefixFile();
+    std::list<CallInfo>::iterator ai = accumulated_prefix.begin(),
+      ae = accumulated_prefix.end();
+    for (; ai != ae; ++ai) {
+      dumpCallInfo(*ai, *file);
+    }
+    dumpCallGroup(*ti, *file);
+    *file <<"also some constraints"<<"\n";
+    delete file;
+  }
+  std::vector< CallTree* >::iterator ci = children.begin(),
+    ce = children.end();
+  for (; ci != ce; ++ci) {
+    accumulated_prefix.push_back(( *ci )->call);
+    ( *ci )->dumpCallPrefixes(accumulated_prefix, fileOpener);
+    accumulated_prefix.pop_back();
+  }
+}
+
 
 //===----------------------------------------------------------------------===//
 // main Driver function
@@ -1483,6 +1740,11 @@ int main(int argc, char **argv, char **envp) {
       }
     }
     interpreter->runFunctionAsMain(mainFn, pArgc, pArgv, pEnvp);
+    handler->getInfoStream()
+      << "KLEE: saving call prefixes \n";
+
+    handler->dumpCallPathPrefixes();
+
 
     while (!seeds.empty()) {
       kTest_free(seeds.back());
