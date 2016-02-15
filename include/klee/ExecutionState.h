@@ -71,6 +71,8 @@ struct FieldDescr {
   std::string name;
   ref<Expr> inVal;
   ref<Expr> outVal;
+
+  bool eq(const FieldDescr& other) const;
 };
 
 struct CallArg {
@@ -82,6 +84,9 @@ struct CallArg {
   llvm::Function* funPtr;
   std::string name;
   std::map<int, FieldDescr> fields;
+
+  bool eq(const CallArg& other) const;
+  bool sameInvocationValue(const CallArg& other) const;
 };
 
 struct RetVal {
@@ -91,14 +96,21 @@ struct RetVal {
   ref<Expr> val;
   llvm::Function* funPtr;
   std::map<int, FieldDescr> fields;
+
+  bool eq(const RetVal& other) const;
 };
 
+//TODO: Store assumptions increment as well. it is an important part of the call
+// these assumptions allow then to correctly match and distinguish call path prefixes.
 struct CallInfo {
   llvm::Function* f;
   std::vector< CallArg > args;
   RetVal ret;
   bool returned;
+
   CallArg* getCallArgPtrp(ref<Expr> ptr);
+  bool eq(const CallInfo& other) const;
+  bool sameInvocation(const CallInfo* other) const;
 };
 
 /// @brief ExecutionState representing a path under exploration
