@@ -911,7 +911,6 @@ void CallTree::dumpCallPrefixes(std::list<CallInfo> accumulated_prefix,
     for (; ai != ae; ++ai) {
       dumpCallInfo(*ai, *file);
     }
-    dumpCallGroup(*ti, *file);
     *file <<"--- Constraints ---\n";
     for (std::list<const std::vector<ref<Expr> >* >::const_iterator
            cgi = accumulated_context.begin(),
@@ -920,6 +919,7 @@ void CallTree::dumpCallPrefixes(std::list<CallInfo> accumulated_prefix,
              ce = (**cgi).end(); ci != ce; ++ci) {
         *file <<**ci<<"\n";
       }
+      *file<<"---\n";
     }
     *file <<"--- Alternatives ---\n";
     //FIXME: currently there can not be more than one alternative.
@@ -927,8 +927,13 @@ void CallTree::dumpCallPrefixes(std::list<CallInfo> accumulated_prefix,
     for (std::vector<CallInfo*>::const_iterator chi = ti->begin(),
            che = ti->end(); chi != che; ++chi) {
       *file <<"(and \n";
-      for (std::vector<ref<Expr> >::const_iterator ei = (**chi).context.begin(),
-             ee = (**chi).context.end(); ei != ee; ++ei) {
+      dumpCallInfo(**chi, *file);
+      for (std::vector<ref<Expr> >::const_iterator ei = (**chi).callContext.begin(),
+             ee = (**chi).callContext.end(); ei != ee; ++ei) {
+        *file <<**ei<<"\n";
+      }
+      for (std::vector<ref<Expr> >::const_iterator ei = (**chi).returnContext.begin(),
+             ee = (**chi).returnContext.end(); ei != ee; ++ei) {
         *file <<**ei<<"\n";
       }
       *file <<"true)\n";
@@ -940,8 +945,10 @@ void CallTree::dumpCallPrefixes(std::list<CallInfo> accumulated_prefix,
     ce = children.end();
   for (; ci != ce; ++ci) {
     accumulated_prefix.push_back(( *ci )->call);
-    accumulated_context.push_back(&(*ci)->call.context);
+    accumulated_context.push_back(&(*ci)->call.callContext);
+    accumulated_context.push_back(&(*ci)->call.returnContext);
     ( *ci )->dumpCallPrefixes(accumulated_prefix, accumulated_context, fileOpener);
+    accumulated_context.pop_back();
     accumulated_context.pop_back();
     accumulated_prefix.pop_back();
   }
