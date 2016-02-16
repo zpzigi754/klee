@@ -14,6 +14,7 @@
 #include "klee/Expr.h"
 #include "klee/Internal/ADT/TreeStream.h"
 #include "klee/MergeHandler.h"
+#include "klee/util/GetExprSymbols.h"
 
 // FIXME: We do not want to be exposing these? :(
 #include "../../lib/Core/AddressSpace.h"
@@ -107,10 +108,12 @@ struct CallInfo {
   std::vector< CallArg > args;
   RetVal ret;
   bool returned;
+  std::vector< ref<Expr> > context;
 
   CallArg* getCallArgPtrp(ref<Expr> ptr);
   bool eq(const CallInfo& other) const;
   bool sameInvocation(const CallInfo* other) const;
+  SymbolSet computeSymbolicVariablesSet() const;
 };
 
 /// @brief ExecutionState representing a path under exploration
