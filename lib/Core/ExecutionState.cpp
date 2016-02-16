@@ -545,6 +545,33 @@ CallArg* CallInfo::getCallArgPtrp(ref<Expr> ptr) {
   return 0;
 }
 
+bool equalContexts(const std::vector<ref<Expr> >& a,
+                   const std::vector<ref<Expr> >& b) {
+  //TODO: naive comparison. should query the solver for the equality of conjunctions.
+  if (a.size() != b.size()) return false;
+  for (unsigned i = 0; i < a.size(); ++i) {
+    bool notFound = true;
+    for (unsigned j = 0; j < b.size(); ++j) {
+      if (*a[i] == *b[j]) {
+        notFound = false;
+        break;
+      }
+    }
+    if (notFound) return false;
+  }
+  for (unsigned i = 0; i < b.size(); ++i) {
+    bool notFound = true;
+    for (unsigned j = 0; j < a.size(); ++j) {
+      if (*a[i] == *b[j]) {
+        notFound = false;
+        break;
+      }
+    }
+    if (notFound) return false;
+  }
+  return true;
+}
+
 bool CallInfo::eq(const CallInfo& other) const {
   if (args.size() != other.args.size()) return false;
   for (unsigned i = 0; i < args.size(); ++i) {
@@ -552,6 +579,7 @@ bool CallInfo::eq(const CallInfo& other) const {
   }
   return f == other.f &&
     ret.eq(other.ret) &&
+    equalContexts(context, other.context) &&
     returned == other.returned;
 }
 
@@ -562,5 +590,28 @@ bool CallInfo::sameInvocation(const CallInfo* other) const {
   for (unsigned i = 0; i < args.size(); ++i) {
     if (!args[i].sameInvocationValue(other->args[i])) return false;
   }
-  return true;
+  return equalContexts(context, other->context);
+}
+
+SymbolSet CallInfo::computeSymbolicVariablesSet() const {
+  assert(returned && "incomplete");
+  SymbolSet symbols;
+  if (!ret.expr.isNull()) {
+    symbols = GetExprSymbols::visit(ret.expr);
+  }
+  if (ret.isPtr && ret.funPtr != NULL) {
+    SymbolSet ptrSymbols = GetExprSymbols::visit(ret.val);
+    symbols.insert(ptrSymbols.begin(), ptrSymbols.end());
+  }
+  for (unsigned i = 0; i < args.size(); ++i) {
+    SymbolSet argSymbols = GetExprSymbols::visit(args[i].expr);
+    symbols.insert(argSymbols.begin(), argSymbols.end());
+    if (args[i].isPtr && args[i].funPtr == NULL) {
+      argSymbols = GetExprSymbols::visit(args[i].val);
+      symbols.insert(argSymbols.begin(), argSymbols.end());
+      argSymbols = GetExprSymbols::visit(args[i].outVal);
+      symbols.insert(argSymbols.begin(), argSymbols.end());
+    }
+  }
+  return symbols;
 }

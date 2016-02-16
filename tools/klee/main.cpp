@@ -217,14 +217,14 @@ class KleeHandler;
 class CallTree {
   std::vector<CallTree* > children;
   CallInfo call;
-  ConstraintManager context;//TODO: this should be present already in the CallInfo.
   std::vector<std::vector<CallInfo*> > groupChildren();
 public:
-  CallTree():children(), call(), context(){};
+  CallTree():children(), call(){};
   void addCallPath(std::vector<CallInfo>::const_iterator path_begin,
-                   std::vector<CallInfo>::const_iterator path_end,
-                   const ConstraintManager& constraints);
+                   std::vector<CallInfo>::const_iterator path_end);
   void dumpCallPrefixes(std::list<CallInfo> accumulated_prefix,
+                        std::list<const std::vector<ref<Expr> >* >
+                        accumulated_context,
                         KleeHandler* fileOpener);
 
   int refCount;
@@ -565,7 +565,7 @@ void KleeHandler::processTestCase(const ExecutionState &state,
 }
 
 void KleeHandler::processCallPath(const ExecutionState &state) {
-  m_callTree.addCallPath(state.callPath.begin(), state.callPath.end(), state.constraints);
+  m_callTree.addCallPath(state.callPath.begin(), state.callPath.end());
   unsigned id = ++m_callPathIndex;
   std::stringstream filename;
   filename << "call-path" << std::setfill('0') << std::setw(6) << id << '.' << "txt";
@@ -634,7 +634,9 @@ llvm::raw_fd_ostream *KleeHandler::openNextCallPathPrefixFile() {
 }
 
 void KleeHandler::dumpCallPathPrefixes() {
-  m_callTree.dumpCallPrefixes(std::list<CallInfo>(), this);
+  m_callTree.dumpCallPrefixes(std::list<CallInfo>(),
+                              std::list<const std::vector<ref<Expr> >* >(),
+                              this);
 }
 
 
@@ -718,8 +720,7 @@ std::string KleeHandler::getRunTimeLibraryPath(const char *argv0) {
 }
 
 void CallTree::addCallPath(std::vector<CallInfo>::const_iterator path_begin,
-                           std::vector<CallInfo>::const_iterator path_end,
-                           const ConstraintManager& constraints) {
+                           std::vector<CallInfo>::const_iterator path_end) {
   //TODO: do we process constraints (what if they are different from the old ones?)
   //TODO: record assumptions for each item in the call-path, because, when
   // comparing two paths in the tree they may differ only by the assumptions.
@@ -729,15 +730,14 @@ void CallTree::addCallPath(std::vector<CallInfo>::const_iterator path_begin,
   std::vector<CallTree*>::iterator i = children.begin(), ie = children.end();
   for (; i!=ie; ++i) {
     if ((*i)->call.eq(*path_begin)) {
-      (*i)->addCallPath(next, path_end, constraints);
+      (*i)->addCallPath(next, path_end);
       return;
     }
   }
   children.push_back(new CallTree());
   CallTree* n = children.back();
   n->call = *path_begin;
-  n->context = constraints;
-  n->addCallPath(next, path_end, constraints);
+  n->addCallPath(next, path_end);
 }
 
 void dumpCallInfo(const CallInfo& ci, llvm::raw_ostream& file) {
@@ -910,7 +910,9 @@ void dumpCallGroup(const std::vector<CallInfo*> group, llvm::raw_ostream& file) 
 }
 
 void CallTree::dumpCallPrefixes(std::list<CallInfo> accumulated_prefix,
-                                  KleeHandler* fileOpener) {
+                                std::list<const std::vector<ref<Expr> >* >
+                                accumulated_context,
+                                KleeHandler* fileOpener) {
   std::vector<std::vector<CallInfo*> > tipCalls = groupChildren();
   std::vector<std::vector<CallInfo*> >::iterator ti = tipCalls.begin(),
     te = tipCalls.end();
@@ -922,14 +924,37 @@ void CallTree::dumpCallPrefixes(std::list<CallInfo> accumulated_prefix,
       dumpCallInfo(*ai, *file);
     }
     dumpCallGroup(*ti, *file);
-    *file <<"also some constraints"<<"\n";
+    *file <<"--- Constraints ---\n";
+    for (std::list<const std::vector<ref<Expr> >* >::const_iterator
+           cgi = accumulated_context.begin(),
+           cge = accumulated_context.end(); cgi != cge; ++cgi) {
+      for (std::vector<ref<Expr> >::const_iterator ci = (**cgi).begin(),
+             ce = (**cgi).end(); ci != ce; ++ci) {
+        *file <<**ci<<"\n";
+      }
+    }
+    *file <<"--- Alternatives ---\n";
+    //FIXME: currently there can not be more than one alternative.
+    *file <<"(or \n";
+    for (std::vector<CallInfo*>::const_iterator chi = ti->begin(),
+           che = ti->end(); chi != che; ++chi) {
+      *file <<"(and \n";
+      for (std::vector<ref<Expr> >::const_iterator ei = (**chi).context.begin(),
+             ee = (**chi).context.end(); ei != ee; ++ei) {
+        *file <<**ei<<"\n";
+      }
+      *file <<"true)\n";
+    }
+    *file <<"false)\n";
     delete file;
   }
   std::vector< CallTree* >::iterator ci = children.begin(),
     ce = children.end();
   for (; ci != ce; ++ci) {
     accumulated_prefix.push_back(( *ci )->call);
-    ( *ci )->dumpCallPrefixes(accumulated_prefix, fileOpener);
+    accumulated_context.push_back(&(*ci)->call.context);
+    ( *ci )->dumpCallPrefixes(accumulated_prefix, accumulated_context, fileOpener);
+    accumulated_context.pop_back();
     accumulated_prefix.pop_back();
   }
 }
