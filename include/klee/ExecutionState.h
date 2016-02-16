@@ -108,12 +108,15 @@ struct CallInfo {
   std::vector< CallArg > args;
   RetVal ret;
   bool returned;
-  std::vector< ref<Expr> > context;
+  std::vector< ref<Expr> > callContext;
+  std::vector< ref<Expr> > returnContext;
 
   CallArg* getCallArgPtrp(ref<Expr> ptr);
   bool eq(const CallInfo& other) const;
   bool sameInvocation(const CallInfo* other) const;
   SymbolSet computeSymbolicVariablesSet() const;
+  SymbolSet computeInvocationSymbolSet() const;
+  SymbolSet computeRetSymbolSet() const;
 };
 
 /// @brief ExecutionState representing a path under exploration
@@ -244,6 +247,8 @@ public:
   void traceArgPtrField(ref<Expr> arg, int offset,
                         Expr::Width width, std::string name);
   void traceRetPtrField(int offset, Expr::Width width, std::string name);
+
+  std::vector<ref<Expr> > relevantConstraints(SymbolSet symbols) const;
 };
 }
 #endif
