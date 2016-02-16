@@ -1361,14 +1361,6 @@ static inline const llvm::fltSemantics * fpWidthToSemantics(unsigned width) {
   }
 }
 
-bool symbolSetsIntersect(const SymbolSet& a, const SymbolSet& b) {
-  if (a.size() > b.size()) return symbolSetsIntersect(b, a);
-  for (SymbolSet::const_iterator i = a.begin(), e = a.end(); i != e; ++i) {
-    if (b.count(*i)) return true;
-  }
-  return false;
-}
-
 void klee::FillCallInfoOutput(Function* f,
                               bool isVoidReturn,
                               ref<Expr> result,
@@ -1452,15 +1444,10 @@ void klee::FillCallInfoOutput(Function* f,
 
   info->returned = true;
 
-  SymbolSet symbols = info->computeSymbolicVariablesSet();
-  for (ConstraintManager::constraint_iterator ci = state.constraints.begin(),
-         cEnd = state.constraints.end(); ci != cEnd; ++ci) {
-    SymbolSet constrainedSymbols = GetExprSymbols::visit(*ci);
-    if (symbolSetsIntersect(constrainedSymbols, symbols)) {
-      symbols.insert(constrainedSymbols.begin(), constrainedSymbols.end());
-      info->context.push_back(*ci);
-    }
-  }
+  SymbolSet symbols = info->computeRetSymbolSet();
+  std::vector<ref<Expr> > constrs = state.relevantConstraints(symbols);
+  info->returnContext.insert(info->returnContext.end(),
+                             constrs.begin(), constrs.end());
 }
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {

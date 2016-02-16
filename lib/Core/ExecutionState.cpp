@@ -383,6 +383,28 @@ void ExecutionState::dumpStack(llvm::raw_ostream &out) const {
   }
 }
 
+bool symbolSetsIntersect(const SymbolSet& a, const SymbolSet& b) {
+  if (a.size() > b.size()) return symbolSetsIntersect(b, a);
+  for (SymbolSet::const_iterator i = a.begin(), e = a.end(); i != e; ++i) {
+    if (b.count(*i)) return true;
+  }
+  return false;
+}
+
+std::vector<ref<Expr> > ExecutionState::
+relevantConstraints(SymbolSet symbols) const {
+  std::vector<ref<Expr> > ret;
+  for (ConstraintManager::constraint_iterator ci = constraints.begin(),
+         cEnd = constraints.end(); ci != cEnd; ++ci) {
+    SymbolSet constrainedSymbols = GetExprSymbols::visit(*ci);
+    if (symbolSetsIntersect(constrainedSymbols, symbols)) {
+      symbols.insert(constrainedSymbols.begin(), constrainedSymbols.end());
+      ret.push_back(*ci);
+    }
+  }
+  return ret;
+}
+
 ref<Expr> ExecutionState::readMemoryChunk(ref<Expr> addr,
                                           Expr::Width width) const {
   ObjectPair op;
@@ -421,6 +443,10 @@ void ExecutionState::traceArgValue(ref<Expr> val, std::string name) {
   argInfo->expr = val;
   argInfo->isPtr = false;
   argInfo->name = name;
+  std::vector<ref<Expr> > constrs =
+    relevantConstraints(GetExprSymbols::visit(val));
+  callPath.back().callContext.insert(callPath.back().callContext.end(),
+                                     constrs.begin(), constrs.end());
 }
 
 void ExecutionState::traceArgPtr(ref<Expr> arg, Expr::Width width,
@@ -431,6 +457,12 @@ void ExecutionState::traceArgPtr(ref<Expr> arg, Expr::Width width,
   argInfo->outWidth = width;
   argInfo->funPtr = NULL;
   argInfo->val = readMemoryChunk(arg, width);
+  SymbolSet symbols = GetExprSymbols::visit(arg);
+  SymbolSet indirectSymbols = GetExprSymbols::visit(argInfo->val);
+  symbols.insert(indirectSymbols.begin(), indirectSymbols.end());
+  std::vector<ref<Expr> > constrs = relevantConstraints(symbols);
+  callPath.back().callContext.insert(callPath.back().callContext.end(),
+                              constrs.begin(), constrs.end());
 }
 
 void ExecutionState::traceArgFunPtr(ref<Expr> arg,
@@ -579,7 +611,8 @@ bool CallInfo::eq(const CallInfo& other) const {
   }
   return f == other.f &&
     ret.eq(other.ret) &&
-    equalContexts(context, other.context) &&
+    equalContexts(callContext, other.callContext) &&
+    equalContexts(returnContext, other.returnContext) &&
     returned == other.returned;
 }
 
@@ -590,10 +623,23 @@ bool CallInfo::sameInvocation(const CallInfo* other) const {
   for (unsigned i = 0; i < args.size(); ++i) {
     if (!args[i].sameInvocationValue(other->args[i])) return false;
   }
-  return equalContexts(context, other->context);
+  return equalContexts(callContext, other->callContext);
 }
 
-SymbolSet CallInfo::computeSymbolicVariablesSet() const {
+SymbolSet CallInfo::computeInvocationSymbolSet() const {
+  SymbolSet symbols;
+  for (unsigned i = 0; i < args.size(); ++i) {
+    SymbolSet argSymbols = GetExprSymbols::visit(args[i].expr);
+    symbols.insert(argSymbols.begin(), argSymbols.end());
+    if (args[i].isPtr && args[i].funPtr == NULL) {
+      argSymbols = GetExprSymbols::visit(args[i].val);
+      symbols.insert(argSymbols.begin(), argSymbols.end());
+    }
+  }
+  return symbols;
+}
+
+SymbolSet CallInfo::computeRetSymbolSet() const {
   assert(returned && "incomplete");
   SymbolSet symbols;
   if (!ret.expr.isNull()) {
@@ -604,14 +650,18 @@ SymbolSet CallInfo::computeSymbolicVariablesSet() const {
     symbols.insert(ptrSymbols.begin(), ptrSymbols.end());
   }
   for (unsigned i = 0; i < args.size(); ++i) {
-    SymbolSet argSymbols = GetExprSymbols::visit(args[i].expr);
-    symbols.insert(argSymbols.begin(), argSymbols.end());
     if (args[i].isPtr && args[i].funPtr == NULL) {
-      argSymbols = GetExprSymbols::visit(args[i].val);
-      symbols.insert(argSymbols.begin(), argSymbols.end());
-      argSymbols = GetExprSymbols::visit(args[i].outVal);
+      SymbolSet argSymbols = GetExprSymbols::visit(args[i].outVal);
       symbols.insert(argSymbols.begin(), argSymbols.end());
     }
   }
   return symbols;
 }
+
+SymbolSet CallInfo::computeSymbolicVariablesSet() const {
+  SymbolSet symbols = computeInvocationSymbolSet();
+  SymbolSet retSymbols = computeRetSymbolSet();
+  symbols.insert(retSymbols.begin(), retSymbols.end());
+  return symbols;
+}
+
