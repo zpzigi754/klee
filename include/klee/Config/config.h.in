@@ -12,6 +12,9 @@
 /* Using STP Solver backend */
 #undef ENABLE_STP
 
+/* Using Z3 Solver backend */
+#undef ENABLE_Z3
+
 /* Does the platform use __ctype_b_loc, etc. */
 #undef HAVE_CTYPE_EXTERNALS
 
@@ -59,6 +62,9 @@
 
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
+
+/* Z3 needs a Z3_context passed to Z3_get_error_msg() */
+#undef HAVE_Z3_GET_ERROR_MSG_NEEDS_CONTEXT
 
 /* LLVM version is release (instead of development) */
 #undef LLVM_IS_RELEASE

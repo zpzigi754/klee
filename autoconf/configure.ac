@@ -614,6 +614,71 @@ AC_SUBST(ENABLE_STP)
 AC_SUBST(STP_CFLAGS)
 AC_SUBST(STP_LDFLAGS)
 
+dnl **************************************************************************
+dnl Find an install of Z3
+dnl **************************************************************************
+
+ENABLE_Z3=0
+AC_ARG_WITH(z3,
+  AS_HELP_STRING([--with-z3], [Location of Z3 installation directory]), [
+    # Check for empty argument
+    if test "X$withval" = X ; then
+      AC_MSG_ERROR([<path> cannot be empty in --with-z3=<path>])
+    fi
+    z3_root=`(cd $withval && pwd) 2> /dev/null`
+
+    #Check for bad path
+    if test "X$z3_root" = X ; then
+      AC_MSG_ERROR([Cannot access path $with_z3 passed to --with-z3])
+    fi
+
+    Z3_CFLAGS="-I$z3_root/include"
+    Z3_LDFLAGS="-L$z3_root/lib"
+    ENABLE_Z3=1
+  ])
+
+if test "X$ENABLE_Z3" != X0 ; then
+    old_CPPFLAGS="$CPPFLAGS"
+    CPPFLAGS="$CPPFLAGS $Z3_CFLAGS"
+    old_CPPFLAGS="$CPPFLAGS"
+    AC_CHECK_HEADER(z3.h,,
+        [
+            AC_MSG_ERROR([Unable to use z3.h header])
+        ])
+    CPPFLAGS="$old_CPPFLAGS"
+
+    AC_CHECK_LIB(z3, Z3_mk_context,[:], [
+           AC_MSG_ERROR([Unable to link against z3])
+    ], "$Z3_LDFLAGS")
+
+    # Test which function signature of ``Z3_get_error_msg()`` we need to use.
+    # There's an API break between Z3 4.4.1 and the master branch
+    AC_MSG_CHECKING([if Z3_get_error_msg() requires Z3_context])
+    AC_COMPILE_IFELSE(
+      [AC_LANG_PROGRAM([[#include "z3.h"]],
+                       [[Z3_context c = Z3_mk_context(0); Z3_get_error_msg(c, Z3_OK);]])],
+      [Z3_HAS_ERROR_MSG_CONTEXT=1],
+      [Z3_HAS_ERROR_MSG_CONTEXT=0])
+
+    if test "X$Z3_HAS_ERROR_MSG_CONTEXT" == X1; then
+      AC_DEFINE(HAVE_Z3_GET_ERROR_MSG_NEEDS_CONTEXT, [1], [Z3 needs a Z3_context passed to Z3_get_error_msg()])
+      AC_MSG_RESULT([yes])
+    else
+      AC_MSG_RESULT([no])
+    fi
+
+    Z3_LDFLAGS="${Z3_LDFLAGS} -lz3"
+    AC_MSG_NOTICE([Using Z3 solver backend])
+    CPPFLAGS="$old_CPPFLAGS"
+    AC_DEFINE(ENABLE_Z3, [1], [Using Z3 Solver backend])
+else
+    AC_MSG_NOTICE([Not using Z3 solver backend])
+fi
+
+AC_SUBST(ENABLE_Z3)
+AC_SUBST(Z3_CFLAGS)
+AC_SUBST(Z3_LDFLAGS)
+
 
 dnl **************************************************************************
 dnl User option to enable metaSMT constraint solvers and to specify the
@@ -661,8 +726,8 @@ dnl **************************************************************************
 dnl Check at least one solver backend is enabled
 dnl **************************************************************************
 
-if test "X$ENABLE_STP$ENABLE_METASMT" == X00 ; then
-    AC_MSG_ERROR([At least one solver backend must be enabled, try using --with-stp or --with-metasmt])
+if test "X$ENABLE_STP$ENABLE_Z3$ENABLE_METASMT" == X000 ; then
+    AC_MSG_ERROR([At least one solver backend must be enabled, try using --with-stp, --with-z3 or --with-metasmt])
 fi
 
 

@@ -1,5 +1,14 @@
 /* -*- mode: c++; c-basic-offset: 2; -*- */
 
+//===-- main.cpp ------------------------------------------------*- C++ -*-===//
+//
+//                     The KLEE Symbolic Virtual Machine
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
+//
+//===----------------------------------------------------------------------===//
+
 #include "klee/ExecutionState.h"
 #include "klee/Expr.h"
 #include "klee/Interpreter.h"
@@ -191,6 +200,11 @@ namespace {
 
   cl::list<std::string>
   SeedOutDir("seed-out-dir");
+
+  cl::list<std::string>
+  LinkLibraries("link-llvm-lib",
+		cl::desc("Link the given libraries before execution"),
+		cl::value_desc("library file"));
 
   cl::opt<unsigned>
   MakeConcreteSymbolic("make-concrete-symbolic",
@@ -510,6 +524,8 @@ void KleeHandler::processTestCase(const ExecutionState &state,
     }
 
     if (WriteCVCs) {
+      // FIXME: If using Z3 as the core solver the emitted file is actually
+      // SMT-LIBv2 not CVC which is a bit confusing
       std::string constraints;
       m_interpreter->getConstraintLog(state, constraints, Interpreter::STP);
       llvm::raw_ostream *f = openTestFile("cvc", id);
@@ -1618,6 +1634,14 @@ int main(int argc, char **argv, char **envp) {
     assert(mainModule && "unable to link with simple model");
   }
 
+  std::vector<std::string>::iterator libs_it;
+  std::vector<std::string>::iterator libs_ie;
+  for (libs_it = LinkLibraries.begin(), libs_ie = LinkLibraries.end();
+          libs_it != libs_ie; ++libs_it) {
+    const char * libFilename = libs_it->c_str();
+    klee_message("Linking in library: %s.\n", libFilename);
+    mainModule = klee::linkWithLibrary(mainModule, libFilename);
+  }
   // Get the desired main function.  klee_main initializes uClibc
   // locale and other data and then calls main.
   Function *mainFn = mainModule->getFunction(EntryPoint);
