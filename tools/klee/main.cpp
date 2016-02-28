@@ -551,6 +551,56 @@ void KleeHandler::processTestCase(const ExecutionState &state,
   }
 }
 
+bool dumpCallInfo(const CallInfo& ci, llvm::raw_ostream& file) {
+  file << ci.f->getName() <<"(";
+  for (std::vector< CallArg >::const_iterator argIter = ci.args.begin(),
+         end = ci.args.end(); argIter != end; ++argIter) {
+    const CallArg *arg = &*argIter;
+    file <<arg->name <<":";
+    file <<*arg->expr;
+    if (arg->isPtr) {
+      file <<"&";
+      if (arg->funPtr == NULL) {
+        file <<"[" <<*arg->val;
+        if (arg->outVal.isNull()) return false;
+        file <<"->" <<*arg->outVal <<"]";
+        std::map<int, FieldDescr>::const_iterator i = arg->fields.begin(),
+            e = arg->fields.end();
+        for (; i != e; ++i) {
+          file <<"[" <<i->second.name <<":" <<*i->second.inVal << "->";
+          if (i->second.outVal.isNull()) return false;
+          file <<*i->second.outVal <<"]";
+        }
+      } else {
+        file <<arg->funPtr->getName();
+      }
+    }
+    if (argIter+1 != end)
+      file <<",";
+  }
+  file <<") -> ";
+  if (ci.ret.expr.isNull()) {
+    file <<"[]";
+  } else {
+    file <<*ci.ret.expr;
+    if (ci.ret.isPtr) {
+      file <<"&";
+      if (ci.ret.funPtr == NULL) {
+        file <<"[" <<*ci.ret.val <<"]";
+        std::map<int, FieldDescr>::const_iterator i = ci.ret.fields.begin(),
+          e = ci.ret.fields.end();
+        for (; i != e; ++i) {
+          file <<"[" <<i->second.name <<":" <<*i->second.outVal << "]";
+        }
+      } else {
+        file <<ci.ret.funPtr->getName();
+      }
+    }
+  }
+  file <<"\n";
+  return true;
+}
+
 void KleeHandler::processCallPath(const ExecutionState &state) {
   m_callTree.addCallPath(state.callPath.begin(), state.callPath.end());
   unsigned id = ++m_callPathIndex;
@@ -560,50 +610,8 @@ void KleeHandler::processCallPath(const ExecutionState &state) {
   for (std::vector<CallInfo>::const_iterator iter = state.callPath.begin(),
          end = state.callPath.end(); iter != end; ++iter) {
     const CallInfo& ci = *iter;
-    *file << ci.f->getName() <<"(";
-    for (std::vector< CallArg >::const_iterator argIter = ci.args.begin(),
-           end = ci.args.end(); argIter != end; ++argIter) {
-      const CallArg *arg = &*argIter;
-      *file <<arg->name <<":";
-      *file <<*arg->expr;
-      if (arg->isPtr) {
-        *file <<"&";
-        if (arg->funPtr == NULL) {
-          *file <<"[" <<*arg->val;
-          *file <<"->" <<*arg->outVal <<"]";
-          std::map<int, FieldDescr>::const_iterator i = arg->fields.begin(),
-            e = arg->fields.end();
-          for (; i != e; ++i) {
-            *file <<"[" <<i->second.name <<":" <<*i->second.inVal << "->";
-            *file <<*i->second.outVal <<"]";
-          }
-        } else {
-          *file <<arg->funPtr->getName();
-        }
-      }
-      if (argIter+1 != end)
-        *file <<",";
-    }
-    *file <<") -> ";
-    if (ci.ret.expr.isNull()) {
-      *file <<"[]";
-    } else {
-      *file <<*ci.ret.expr;
-      if (ci.ret.isPtr) {
-        *file <<"&";
-        if (ci.ret.funPtr == NULL) {
-          *file <<"[" <<*ci.ret.val <<"]";
-          std::map<int, FieldDescr>::const_iterator i = ci.ret.fields.begin(),
-            e = ci.ret.fields.end();
-          for (; i != e; ++i) {
-            *file <<"[" <<i->second.name <<":" <<*i->second.outVal << "]";
-          }
-        } else {
-          *file <<ci.ret.funPtr->getName();
-        }
-      }
-    }
-    *file <<"\n";
+    bool dumped = dumpCallInfo(ci, *file);
+    if (!dumped) break;
   }
   *file <<";;-- Constraints --\n";
   for (ConstraintManager::constraint_iterator ci = state.constraints.begin(),
@@ -726,53 +734,6 @@ void CallTree::addCallPath(std::vector<CallInfo>::const_iterator path_begin,
   CallTree* n = children.back();
   n->call = *path_begin;
   n->addCallPath(next, path_end);
-}
-
-void dumpCallInfo(const CallInfo& ci, llvm::raw_ostream& file) {
-  file << ci.f->getName() <<"(";
-  for (std::vector< CallArg >::const_iterator argIter = ci.args.begin(),
-         end = ci.args.end(); argIter != end; ++argIter) {
-    const CallArg *arg = &*argIter;
-    file <<arg->name <<":";
-    file <<*arg->expr;
-    if (arg->isPtr) {
-      file <<"&";
-      if (arg->funPtr == NULL) {
-        file <<"[" <<*arg->val;
-        file <<"->" <<*arg->outVal <<"]";
-        std::map<int, FieldDescr>::const_iterator i = arg->fields.begin(),
-            e = arg->fields.end();
-        for (; i != e; ++i) {
-          file <<"[" <<i->second.name <<":" <<*i->second.inVal << "->";
-          file <<*i->second.outVal <<"]";
-        }
-      } else {
-        file <<arg->funPtr->getName();
-      }
-    }
-    if (argIter+1 != end)
-      file <<",";
-  }
-  file <<") -> ";
-  if (ci.ret.expr.isNull()) {
-    file <<"[]";
-  } else {
-    file <<*ci.ret.expr;
-    if (ci.ret.isPtr) {
-      file <<"&";
-      if (ci.ret.funPtr == NULL) {
-        file <<"[" <<*ci.ret.val <<"]";
-        std::map<int, FieldDescr>::const_iterator i = ci.ret.fields.begin(),
-          e = ci.ret.fields.end();
-        for (; i != e; ++i) {
-          file <<"[" <<i->second.name <<":" <<*i->second.outVal << "]";
-        }
-      } else {
-        file <<ci.ret.funPtr->getName();
-      }
-    }
-  }
-  file <<"\n";
 }
 
 std::vector<std::vector<CallInfo*> > CallTree::groupChildren() {
@@ -909,7 +870,8 @@ void CallTree::dumpCallPrefixes(std::list<CallInfo> accumulated_prefix,
     std::list<CallInfo>::iterator ai = accumulated_prefix.begin(),
       ae = accumulated_prefix.end();
     for (; ai != ae; ++ai) {
-      dumpCallInfo(*ai, *file);
+      bool dumped = dumpCallInfo(*ai, *file);
+      assert(dumped);
     }
     *file <<"--- Constraints ---\n";
     for (std::list<const std::vector<ref<Expr> >* >::const_iterator
@@ -927,7 +889,8 @@ void CallTree::dumpCallPrefixes(std::list<CallInfo> accumulated_prefix,
     for (std::vector<CallInfo*>::const_iterator chi = ti->begin(),
            che = ti->end(); chi != che; ++chi) {
       *file <<"(and \n";
-      dumpCallInfo(**chi, *file);
+      bool dumped = dumpCallInfo(**chi, *file);
+      assert(dumped);
       for (std::vector<ref<Expr> >::const_iterator ei = (**chi).callContext.begin(),
              ee = (**chi).callContext.end(); ei != ee; ++ei) {
         *file <<**ei<<"\n";
