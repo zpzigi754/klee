@@ -227,6 +227,8 @@ public:
                         std::list<const std::vector<ref<Expr> >* >
                         accumulated_context,
                         KleeHandler* fileOpener);
+  void dumpCallPrefixesSExpr(std::list<CallInfo> accumulated_prefix,
+                             KleeHandler* fileOpener);
 
   int refCount;
 };
@@ -601,6 +603,84 @@ bool dumpCallInfo(const CallInfo& ci, llvm::raw_ostream& file) {
   return true;
 }
 
+bool dumpCallArgSExpr(const CallArg *arg, llvm::raw_ostream& file) {
+  file <<"((name " <<arg->name <<")\n";
+  file <<"(value (full " <<*arg->expr <<"))\n";
+  file <<"(is-ptr " <<arg->isPtr <<")\n";
+  if (arg->isPtr) {
+    file <<"(is-fun-ptr " <<(arg->funPtr != NULL) <<")\n";
+    if (arg->funPtr == NULL) {
+      file <<"(pointee-before (full "<<*arg->val <<")\n";
+      file <<"(break-down (\n";
+      std::map<int, FieldDescr>::const_iterator i = arg->fields.begin(),
+        e = arg->fields.end();
+      for (; i != e; ++i) {
+        file <<"((name " <<i->second.name <<") (value (full " <<*i->second.inVal << ")))";
+      }
+      file <<")))\n";
+      if (arg->outVal.isNull()) return false;
+      file <<"(pointee-after (full " <<*arg->outVal <<")\n";
+      file <<"(break-down (\n";
+      i = arg->fields.begin(),
+        e = arg->fields.end();
+      for (; i != e; ++i) {
+        if (i->second.outVal.isNull()) return false;
+        file <<"((name " <<i->second.name <<") (value (full " <<*i->second.outVal <<")))\n";
+      }
+      file <<")))\n";
+    } else {
+      file <<"(fun-name " <<arg->funPtr->getName() <<")\n";
+    }
+  }
+  file <<")\n";
+  return true;
+}
+
+bool dumpCallInfoSExpr(const CallInfo& ci, llvm::raw_ostream& file) {
+  file <<"((fun-name " <<ci.f->getName() <<")\n (args\n";
+  for (std::vector< CallArg >::const_iterator argIter = ci.args.begin(),
+         end = ci.args.end(); argIter != end; ++argIter) {
+    const CallArg *arg = &*argIter;
+    if (!dumpCallArgSExpr(arg, file)) return false;
+  }
+  file <<")\n";
+  if (ci.ret.expr.isNull()) {
+    file <<"(ret-val)";
+  } else {
+    file <<"(ret-val (value (full " <<*ci.ret.expr <<"))\n";
+    file <<"(is-ptr " << ci.ret.isPtr <<")\n";
+    if (ci.ret.isPtr) {
+      file <<"(is-fun-ptr " <<ci.ret.funPtr <<")\n";
+      if (ci.ret.funPtr == NULL) {
+        file <<"(pointee (full " <<*ci.ret.val <<")\n";
+        std::map<int, FieldDescr>::const_iterator i = ci.ret.fields.begin(),
+          e = ci.ret.fields.end();
+        file <<"(break-down \n";
+        for (; i != e; ++i) {
+          file <<"((name " <<i->second.name <<") (value (full " <<*i->second.outVal << ")))\n";
+        }
+        file <<"))\n";
+      } else {
+        file <<"(" <<ci.ret.funPtr->getName()<<")\n";
+      }
+    }
+    file <<")\n";
+  }
+  file <<"(call-context (\n";
+  for (std::vector<ref<Expr> >::const_iterator cci = ci.callContext.begin(),
+         cce = ci.callContext.end(); cci != cce; ++cci) {
+    file <<**cci<<"\n";
+  }
+  file <<"))\n";
+  file <<"(ret-context (\n";
+  for (std::vector<ref<Expr> >::const_iterator rci = ci.returnContext.begin(),
+         rce = ci.returnContext.end(); rci != rce; ++rci) {
+    file <<**rci<<"\n";
+  }
+  file <<")))\n";
+  return true;
+}
+
 void KleeHandler::processCallPath(const ExecutionState &state) {
   m_callTree.addCallPath(state.callPath.begin(), state.callPath.end());
   unsigned id = ++m_callPathIndex;
@@ -629,9 +709,7 @@ llvm::raw_fd_ostream *KleeHandler::openNextCallPathPrefixFile() {
 }
 
 void KleeHandler::dumpCallPathPrefixes() {
-  m_callTree.dumpCallPrefixes(std::list<CallInfo>(),
-                              std::list<const std::vector<ref<Expr> >* >(),
-                              this);
+  m_callTree.dumpCallPrefixesSExpr(std::list<CallInfo>(), this);
 }
 
 
@@ -917,6 +995,39 @@ void CallTree::dumpCallPrefixes(std::list<CallInfo> accumulated_prefix,
   }
 }
 
+void CallTree::dumpCallPrefixesSExpr(std::list<CallInfo> accumulated_prefix,
+                                     KleeHandler* fileOpener) {
+  std::vector<std::vector<CallInfo*> > tipCalls = groupChildren();
+  std::vector<std::vector<CallInfo*> >::iterator ti = tipCalls.begin(),
+    te = tipCalls.end();
+  for (; ti != te; ++ti) {
+    llvm::raw_ostream* file = fileOpener->openNextCallPathPrefixFile();
+    std::list<CallInfo>::iterator ai = accumulated_prefix.begin(),
+      ae = accumulated_prefix.end();
+    *file <<"(history\n";
+    for (; ai != ae; ++ai) {
+      bool dumped = dumpCallInfoSExpr(*ai, *file);
+      assert(dumped);
+    }
+    *file <<")";
+    //FIXME: currently there can not be more than one alternative.
+    *file <<"(tip-call-alternatives\n";
+    for (std::vector<CallInfo*>::const_iterator chi = ti->begin(),
+           che = ti->end(); chi != che; ++chi) {
+      bool dumped = dumpCallInfoSExpr(**chi, *file);
+      assert(dumped);
+    }
+    *file <<")\n";
+    delete file;
+  }
+  std::vector< CallTree* >::iterator ci = children.begin(),
+    ce = children.end();
+  for (; ci != ce; ++ci) {
+    accumulated_prefix.push_back(( *ci )->call);
+    ( *ci )->dumpCallPrefixesSExpr(accumulated_prefix, fileOpener);
+    accumulated_prefix.pop_back();
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // main Driver function
