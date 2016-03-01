@@ -603,76 +603,85 @@ bool dumpCallInfo(const CallInfo& ci, llvm::raw_ostream& file) {
   return true;
 }
 
+inline const char* boolStr(bool x) {return x ? "true" : "false"; }
+
 bool dumpCallArgSExpr(const CallArg *arg, llvm::raw_ostream& file) {
-  file <<"((name " <<arg->name <<")\n";
-  file <<"(value (full " <<*arg->expr <<"))\n";
-  file <<"(is-ptr " <<arg->isPtr <<")\n";
+  file <<"((name \"" <<arg->name <<"\")\n";
+  file <<"(value ((full " <<*arg->expr <<") (break_down ())))\n";
+  file <<"(is_ptr " <<boolStr(arg->isPtr) <<")\n";
+  file <<"(pointee (\n";
   if (arg->isPtr) {
-    file <<"(is-fun-ptr " <<(arg->funPtr != NULL) <<")\n";
+    file <<"((is_fun_ptr " <<boolStr(arg->funPtr != NULL) <<")\n";
     if (arg->funPtr == NULL) {
-      file <<"(pointee-before (full "<<*arg->val <<")\n";
-      file <<"(break-down (\n";
+      file <<"(fun_name ())\n";
+      file <<"(before (((full "<<*arg->val <<")\n";
+      file <<"(break_down (\n";
       std::map<int, FieldDescr>::const_iterator i = arg->fields.begin(),
         e = arg->fields.end();
       for (; i != e; ++i) {
-        file <<"((name " <<i->second.name <<") (value (full " <<*i->second.inVal << ")))";
+        file <<"((name \"" <<i->second.name <<"\") (value ((full " <<*i->second.inVal << ") (break_down ()))))";
       }
-      file <<")))\n";
+      file <<")))))\n";
       if (arg->outVal.isNull()) return false;
-      file <<"(pointee-after (full " <<*arg->outVal <<")\n";
-      file <<"(break-down (\n";
+      file <<"(after (((full " <<*arg->outVal <<")\n";
+      file <<"(break_down (\n";
       i = arg->fields.begin(),
         e = arg->fields.end();
       for (; i != e; ++i) {
         if (i->second.outVal.isNull()) return false;
-        file <<"((name " <<i->second.name <<") (value (full " <<*i->second.outVal <<")))\n";
+        file <<"((name \"" <<i->second.name <<"\") (value ((full " <<*i->second.outVal <<") (break_down ()))))\n";
       }
-      file <<")))\n";
+      file <<")))))\n";
     } else {
-      file <<"(fun-name " <<arg->funPtr->getName() <<")\n";
+      file <<"(before ()) (after ()) ";
+      file <<"(fun_name (\"" <<arg->funPtr->getName() <<"\"))\n";
     }
+    file <<")\n";
   }
-  file <<")\n";
+  file <<")))\n";
   return true;
 }
 
 bool dumpCallInfoSExpr(const CallInfo& ci, llvm::raw_ostream& file) {
-  file <<"((fun-name " <<ci.f->getName() <<")\n (args\n";
+  file <<"((fun_name \"" <<ci.f->getName() <<"\")\n (args (\n";
   for (std::vector< CallArg >::const_iterator argIter = ci.args.begin(),
          end = ci.args.end(); argIter != end; ++argIter) {
     const CallArg *arg = &*argIter;
     if (!dumpCallArgSExpr(arg, file)) return false;
   }
-  file <<")\n";
+  file <<"))\n";
   if (ci.ret.expr.isNull()) {
-    file <<"(ret-val)";
+    file <<"(ret ())";
   } else {
-    file <<"(ret-val (value (full " <<*ci.ret.expr <<"))\n";
-    file <<"(is-ptr " << ci.ret.isPtr <<")\n";
+    file <<"(ret (((value ((full " <<*ci.ret.expr <<") (break_down ())))\n";
+    file <<"(is_ptr " << boolStr(ci.ret.isPtr) <<")\n";
+    file <<"(pointee (\n";
     if (ci.ret.isPtr) {
-      file <<"(is-fun-ptr " <<ci.ret.funPtr <<")\n";
+      file <<"(is_fun_ptr " <<boolStr(ci.ret.funPtr) <<")\n";
       if (ci.ret.funPtr == NULL) {
-        file <<"(pointee (full " <<*ci.ret.val <<")\n";
+        file <<"((before ()) ";
+        file <<"(after (value (((full " <<*ci.ret.val <<")\n";
         std::map<int, FieldDescr>::const_iterator i = ci.ret.fields.begin(),
           e = ci.ret.fields.end();
-        file <<"(break-down \n";
+        file <<"(break_down \n";
         for (; i != e; ++i) {
-          file <<"((name " <<i->second.name <<") (value (full " <<*i->second.outVal << ")))\n";
+          file <<"((name \"" <<i->second.name <<"\") (value ((full " <<*i->second.outVal << ") (break_down ()))))\n";
         }
-        file <<"))\n";
+        file <<"))))))\n";
       } else {
-        file <<"(" <<ci.ret.funPtr->getName()<<")\n";
+        file <<"((before ()) (after ())";
+        file <<"(fun_name (\"" <<ci.ret.funPtr->getName()<<"\")))\n";
       }
     }
-    file <<")\n";
+    file <<")))))\n";
   }
-  file <<"(call-context (\n";
+  file <<"(call_context (\n";
   for (std::vector<ref<Expr> >::const_iterator cci = ci.callContext.begin(),
          cce = ci.callContext.end(); cci != cce; ++cci) {
     file <<**cci<<"\n";
   }
   file <<"))\n";
-  file <<"(ret-context (\n";
+  file <<"(ret_context (\n";
   for (std::vector<ref<Expr> >::const_iterator rci = ci.returnContext.begin(),
          rce = ci.returnContext.end(); rci != rce; ++rci) {
     file <<**rci<<"\n";
@@ -1004,20 +1013,20 @@ void CallTree::dumpCallPrefixesSExpr(std::list<CallInfo> accumulated_prefix,
     llvm::raw_ostream* file = fileOpener->openNextCallPathPrefixFile();
     std::list<CallInfo>::iterator ai = accumulated_prefix.begin(),
       ae = accumulated_prefix.end();
-    *file <<"(history\n";
+    *file <<"((history (\n";
     for (; ai != ae; ++ai) {
       bool dumped = dumpCallInfoSExpr(*ai, *file);
       assert(dumped);
     }
-    *file <<")";
+    *file <<"))";
     //FIXME: currently there can not be more than one alternative.
-    *file <<"(tip-call-alternatives\n";
+    *file <<"(tip_calls (\n";
     for (std::vector<CallInfo*>::const_iterator chi = ti->begin(),
            che = ti->end(); chi != che; ++chi) {
       bool dumped = dumpCallInfoSExpr(**chi, *file);
       assert(dumped);
     }
-    *file <<")\n";
+    *file <<")))\n";
     delete file;
   }
   std::vector< CallTree* >::iterator ci = children.begin(),
