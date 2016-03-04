@@ -748,6 +748,7 @@ llvm::raw_fd_ostream *KleeHandler::openNextCallPathPrefixFile() {
 
 void KleeHandler::dumpCallPathPrefixes() {
   m_callTree.dumpCallPrefixesSExpr(std::list<CallInfo>(), this);
+  //m_callTree.dumpCallPrefixes(std::list<CallInfo>(), std::list<const std::vector<ref<Expr> >* >(), this);
 }
 
 

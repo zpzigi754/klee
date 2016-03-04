@@ -545,10 +545,9 @@ bool CallArg::sameInvocationValue(const CallArg& other) const {
           (!other.expr.isNull()) && 0 == expr->compare(*other.expr)) &&
     name == other.name &&
     (isPtr ?
-     (other.isPtr && !val.isNull() && !other.val.isNull() &&
-      0 == val->compare(*other.val) &&
-      outWidth == other.outWidth &&
-      funPtr == other.funPtr) :
+     (other.isPtr &&
+      (val.isNull() ? other.val.isNull() && funPtr == other.funPtr :
+       (!other.val.isNull() && 0 == val->compare(*other.val)))) :
      !other.isPtr);
 }
 
