@@ -71,6 +71,7 @@ struct FieldDescr {
   std::string name;
   ref<Expr> inVal;
   ref<Expr> outVal;
+  std::map<int, FieldDescr> fields;
 
   bool eq(const FieldDescr& other) const;
 };
@@ -239,7 +240,11 @@ public:
   void traceRetPtr(Expr::Width width);
   void traceArgPtrField(ref<Expr> arg, int offset,
                         Expr::Width width, std::string name);
+  void traceArgPtrNestedField(ref<Expr> arg, int base_offset, int offset,
+                              Expr::Width width, std::string name);
   void traceRetPtrField(int offset, Expr::Width width, std::string name);
+  void traceRetPtrNestedField(int base_offset, int offset,
+                              Expr::Width width, std::string name);
 
   std::vector<ref<Expr> > relevantConstraints(SymbolSet symbols) const;
 };

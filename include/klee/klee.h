@@ -171,6 +171,10 @@ extern "C" {
 
   void klee_trace_param_ptr_field(void* ptr, int offset, int width, char* name);
   void klee_trace_ret_ptr_field(int offset, int width, char* name);
+  void klee_trace_param_ptr_nested_field(void* ptr, int base_offset,
+                                         int offset, int width, char* name);
+  void klee_trace_ret_ptr_nested_field(int base_offset,
+                                       int offset, int width, char* name);
 
 #ifdef __cplusplus
 }

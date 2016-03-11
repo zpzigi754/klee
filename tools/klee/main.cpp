@@ -634,6 +634,34 @@ bool dumpCallInfo(const CallInfo& ci, llvm::raw_ostream& file) {
 
 inline const char* boolStr(bool x) {return x ? "true" : "false"; }
 
+void dumpFieldsInSExpr(const std::map<int, FieldDescr>& fields,
+                       llvm::raw_ostream& file) {
+  file <<"(break_down (\n";
+  std::map<int, FieldDescr>::const_iterator i = fields.begin(),
+    e = fields.end();
+  for (; i != e; ++i) {
+    file <<"((name \"" <<i->second.name <<"\") (value ((full "
+         <<*i->second.inVal << ")\n";
+    dumpFieldsInSExpr(i->second.fields, file);
+    file <<")))\n";
+  }
+  file <<"))";
+}
+
+ void dumpFieldsOutSExpr(const std::map<int, FieldDescr>& fields,
+                         llvm::raw_ostream& file) {
+   file <<"(break_down (\n";
+   std::map<int, FieldDescr>::const_iterator i = fields.begin(),
+     e = fields.end();
+   for (; i != e; ++i) {
+     file <<"((name \"" <<i->second.name <<"\") (value ((full "
+          <<*i->second.outVal << ")\n";
+     dumpFieldsOutSExpr(i->second.fields, file);
+     file <<")))\n";
+   }
+   file <<"))";
+ }
+
 bool dumpCallArgSExpr(const CallArg *arg, llvm::raw_ostream& file) {
   file <<"((name \"" <<arg->name <<"\")\n";
   file <<"(value ((full " <<*arg->expr <<") (break_down ())))\n";
@@ -644,23 +672,12 @@ bool dumpCallArgSExpr(const CallArg *arg, llvm::raw_ostream& file) {
     if (arg->funPtr == NULL) {
       file <<"(fun_name ())\n";
       file <<"(before (((full "<<*arg->val <<")\n";
-      file <<"(break_down (\n";
-      std::map<int, FieldDescr>::const_iterator i = arg->fields.begin(),
-        e = arg->fields.end();
-      for (; i != e; ++i) {
-        file <<"((name \"" <<i->second.name <<"\") (value ((full " <<*i->second.inVal << ") (break_down ()))))";
-      }
-      file <<")))))\n";
+      dumpFieldsInSExpr(arg->fields, file);
+      file <<")))\n";
       if (arg->outVal.isNull()) return false;
       file <<"(after (((full " <<*arg->outVal <<")\n";
-      file <<"(break_down (\n";
-      i = arg->fields.begin(),
-        e = arg->fields.end();
-      for (; i != e; ++i) {
-        if (i->second.outVal.isNull()) return false;
-        file <<"((name \"" <<i->second.name <<"\") (value ((full " <<*i->second.outVal <<") (break_down ()))))\n";
-      }
-      file <<")))))\n";
+      dumpFieldsOutSExpr(arg->fields, file);
+      file <<")))\n";
     } else {
       file <<"(before ()) (after ()) ";
       file <<"(fun_name (\"" <<arg->funPtr->getName() <<"\"))\n";
@@ -690,13 +707,8 @@ bool dumpCallInfoSExpr(const CallInfo& ci, llvm::raw_ostream& file) {
       if (ci.ret.funPtr == NULL) {
         file <<"((before ()) ";
         file <<"(after (value (((full " <<*ci.ret.val <<")\n";
-        std::map<int, FieldDescr>::const_iterator i = ci.ret.fields.begin(),
-          e = ci.ret.fields.end();
-        file <<"(break_down \n";
-        for (; i != e; ++i) {
-          file <<"((name \"" <<i->second.name <<"\") (value ((full " <<*i->second.outVal << ") (break_down ()))))\n";
-        }
-        file <<"))))))\n";
+        dumpFieldsOutSExpr(ci.ret.fields, file);
+        file <<"))))\n";
       } else {
         file <<"((before ()) (after ())";
         file <<"(fun_name (\"" <<ci.ret.funPtr->getName()<<"\")))\n";
