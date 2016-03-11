@@ -1443,6 +1443,20 @@ static inline const llvm::fltSemantics * fpWidthToSemantics(unsigned width) {
   }
 }
 
+void dumpFields(std::map<int, klee::FieldDescr>* fields, size_t base,
+                      const klee::ExecutionState& state) {
+  std::map<int, klee::FieldDescr>::iterator i = fields->begin(),
+    e = fields->end();
+  for (; i != e; ++i) {
+    int offset = i->first;
+    ref<klee::ConstantExpr> addrExpr =
+      klee::ConstantExpr::alloc(base + offset,
+                                sizeof(size_t)*8);
+    i->second.outVal = state.readMemoryChunk(addrExpr, i->second.width);
+    dumpFields(&i->second.fields, base + offset, state);
+  }
+}
+
 void klee::FillCallInfoOutput(Function* f,
                               bool isVoidReturn,
                               ref<Expr> result,
@@ -1473,14 +1487,7 @@ void klee::FillCallInfoOutput(Function* f,
                                               info->ret.width);
         info->ret.funPtr = NULL;
         size_t base = address->getZExtValue();
-        std::map<int, FieldDescr>::iterator i = info->ret.fields.begin(),
-          e = info->ret.fields.end();
-        for (; i != e; ++i) {
-          int offset = i->first;
-          ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + offset,
-                                                           sizeof(size_t)*8);
-          i->second.outVal = state.readMemoryChunk(addrExpr, i->second.width);
-        }
+        dumpFields(&info->ret.fields, base, state);
       }
     }
     if (retType->isStructTy()) {
@@ -1513,14 +1520,7 @@ void klee::FillCallInfoOutput(Function* f,
     if (arg->isPtr && arg->funPtr == NULL) {
       info->args[i].outVal = state.readMemoryChunk(arg->expr, arg->outWidth);
       size_t base = (cast<ConstantExpr>(arg->expr))->getZExtValue();
-      std::map<int, FieldDescr>::iterator i = arg->fields.begin(),
-        e = arg->fields.end();
-      for (; i != e; ++i) {
-        int offset = i->first;
-        ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + offset,
-                                                         sizeof(size_t)*8);
-        i->second.outVal = state.readMemoryChunk(addrExpr, i->second.width);
-      }
+      dumpFields(&arg->fields, base, state);
     }
   }
 

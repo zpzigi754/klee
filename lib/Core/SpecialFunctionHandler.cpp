@@ -125,6 +125,8 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_trace_ret_ptr", handleTraceRetPtr, false),
   add("klee_trace_param_ptr_field", handleTraceParamPtrField, false),
   add("klee_trace_ret_ptr_field", handleTraceRetPtrField, false),
+  add("klee_trace_param_ptr_nested_field", handleTraceParamPtrNestedField, false),
+  add("klee_trace_ret_ptr_nested_field", handleTraceRetPtrNestedField, false),
 
   // operator delete[](void*)
   add("_ZdaPv", handleDeleteArray, false),
@@ -892,9 +894,33 @@ void SpecialFunctionHandler::handleTraceRetPtrField(ExecutionState &state,
   state.traceRetPtrField(offset, width, name);
 }
 
+void SpecialFunctionHandler::handleTraceRetPtrNestedField
+(ExecutionState &state,
+ KInstruction *target,
+ std::vector<ref<Expr> > &arguments) {
+  int base_offset = (cast<klee::ConstantExpr>(arguments[0]))->getZExtValue();
+  int offset = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
+  Expr::Width width = (cast<klee::ConstantExpr>(arguments[2]))->getZExtValue();
+  std::string name = readStringAtAddress(state, arguments[3]);
+  width = width * 8;//Convert to bits.
+  state.traceRetPtrNestedField(base_offset, offset, width, name);
+}
+
+void SpecialFunctionHandler::handleTraceParamPtrNestedField
+(ExecutionState &state,
+ KInstruction *target,
+ std::vector<ref<Expr> > &arguments) {
+  int base_offset = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
+  int offset = (cast<klee::ConstantExpr>(arguments[2]))->getZExtValue();
+  Expr::Width width = (cast<klee::ConstantExpr>(arguments[3]))->getZExtValue();
+  std::string name = readStringAtAddress(state, arguments[4]);
+  width = width * 8;//Convert to bits.
+  state.traceArgPtrNestedField(arguments[0], base_offset, offset, width, name);
+}
+
 void SpecialFunctionHandler::handleTraceParamPtrField(ExecutionState &state,
-                                                    KInstruction *target,
-                                                    std::vector<ref<Expr> > &arguments) {
+                                                      KInstruction *target,
+                                                      std::vector<ref<Expr> > &arguments) {
   int offset = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
   Expr::Width width = (cast<klee::ConstantExpr>(arguments[2]))->getZExtValue();
   std::string name = readStringAtAddress(state, arguments[3]);

@@ -502,6 +502,31 @@ void ExecutionState::traceArgPtrField(ref<Expr> arg,
   argInfo->fields[offset] = descr;
 }
 
+void ExecutionState::traceArgPtrNestedField(ref<Expr> arg,
+                                            int base_offset,
+                                            int offset,
+                                            Expr::Width width,
+                                            std::string name) {
+  assert(!callPath.empty() &&
+         callPath.back().f == stack.back().kf->function &&
+         "Must trace the function first to trace a particular field.");
+  CallArg *argInfo = callPath.back().getCallArgPtrp(arg);
+  assert(argInfo != 0 &&
+         "Must first trace the pointer arg to trace a particular field.");
+  assert(argInfo->outWidth > 0 && "Cannot fit a field into zero bytes.");
+  assert(argInfo->fields.count(base_offset) != 0 &&
+         "Must first trace the field itself.");
+  assert(argInfo->fields[base_offset].fields.count(offset) == 0 &&
+         "Conflicting field.");
+  FieldDescr descr;
+  descr.width = width;
+  descr.name = name;
+  size_t base = (cast<ConstantExpr>(arg))->getZExtValue();
+  ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + base_offset + offset, sizeof(size_t)*8);
+  descr.inVal = readMemoryChunk(addrExpr, width);
+  argInfo->fields[base_offset].fields[offset] = descr;
+}
+
 void ExecutionState::traceRetPtrField(int offset,
                                       Expr::Width width,
                                       std::string name) {
@@ -516,6 +541,25 @@ void ExecutionState::traceRetPtrField(int offset,
   descr.width = width;
   descr.name = name;
   ret->fields[offset] = descr;
+}
+
+void ExecutionState::traceRetPtrNestedField(int base_offset,
+                                            int offset,
+                                            Expr::Width width,
+                                            std::string name) {
+  assert(!callPath.empty() &&
+         callPath.back().f == stack.back().kf->function &&
+         "Must trace the function first to trace a particular field.");
+  RetVal *ret = &callPath.back().ret;
+  assert(ret->isPtr && "Only a pointer can have fields traced.");
+  assert(ret->width > 0 && "Cannot fit a field in zero sized mem chunk.");
+  assert(ret->fields.count(base_offset) != 0 &&
+         "Must first trace the base field.");
+  assert(ret->fields[base_offset].fields.count(offset) == 0 && "Fields conflict");
+  FieldDescr descr;
+  descr.width = width;
+  descr.name = name;
+  ret->fields[base_offset].fields[offset] = descr;
 }
 
 bool FieldDescr::eq(const FieldDescr& other) const {
