@@ -640,7 +640,7 @@ void dumpFieldsInSExpr(const std::map<int, FieldDescr>& fields,
   std::map<int, FieldDescr>::const_iterator i = fields.begin(),
     e = fields.end();
   for (; i != e; ++i) {
-    file <<"((name \"" <<i->second.name <<"\") (value ((full "
+    file <<"((fname \"" <<i->second.name <<"\") (value ((full "
          <<*i->second.inVal << ")\n";
     dumpFieldsInSExpr(i->second.fields, file);
     file <<")))\n";
@@ -654,7 +654,7 @@ void dumpFieldsInSExpr(const std::map<int, FieldDescr>& fields,
    std::map<int, FieldDescr>::const_iterator i = fields.begin(),
      e = fields.end();
    for (; i != e; ++i) {
-     file <<"((name \"" <<i->second.name <<"\") (value ((full "
+     file <<"((fname \"" <<i->second.name <<"\") (value ((full "
           <<*i->second.outVal << ")\n";
      dumpFieldsOutSExpr(i->second.fields, file);
      file <<")))\n";
@@ -663,7 +663,7 @@ void dumpFieldsInSExpr(const std::map<int, FieldDescr>& fields,
  }
 
 bool dumpCallArgSExpr(const CallArg *arg, llvm::raw_ostream& file) {
-  file <<"((name \"" <<arg->name <<"\")\n";
+  file <<"((aname \"" <<arg->name <<"\")\n";
   file <<"(value ((full " <<*arg->expr <<") (break_down ())))\n";
   file <<"(is_ptr " <<boolStr(arg->isPtr) <<")\n";
   file <<"(pointee (\n";
