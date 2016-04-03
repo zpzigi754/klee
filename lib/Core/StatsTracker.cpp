@@ -16,6 +16,7 @@
 #include "klee/Internal/Module/KModule.h"
 #include "klee/Internal/Module/KInstruction.h"
 #include "klee/Internal/Support/ModuleUtil.h"
+#include "klee/Internal/System/MemoryUsage.h"
 #include "klee/Internal/System/Time.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 #include "klee/SolverStats.h"
@@ -67,45 +68,46 @@ using namespace llvm;
 namespace {  
   cl::opt<bool>
   TrackInstructionTime("track-instruction-time",
-                       cl::desc("Enable tracking of time for individual instructions"),
-                       cl::init(false));
+                       cl::init(false),
+		       cl::desc("Enable tracking of time for individual instructions (default=off)"));
 
   cl::opt<bool>
   OutputStats("output-stats",
-              cl::desc("Write running stats trace file"),
-              cl::init(true));
+              cl::init(true),
+	      cl::desc("Write running stats trace file (default=on)"));
 
   cl::opt<bool>
   OutputIStats("output-istats",
-               cl::desc("Write instruction level statistics (in callgrind format)"),
-               cl::init(true));
+	       cl::init(true),
+               cl::desc("Write instruction level statistics in callgrind format (default=on)"));
 
   cl::opt<double>
   StatsWriteInterval("stats-write-interval",
-                     cl::desc("Approximate number of seconds between stats writes (default: 1.0)"),
-                     cl::init(1.));
+                     cl::init(1.),
+		     cl::desc("Approximate number of seconds between stats writes (default=1.0s)"));
 
   cl::opt<double>
   IStatsWriteInterval("istats-write-interval",
-                      cl::desc("Approximate number of seconds between istats writes (default: 10.0)"),
-                      cl::init(10.));
+		      cl::init(10.),
+                      cl::desc("Approximate number of seconds between istats writes (default: 10.0s)"));
 
   /*
   cl::opt<double>
   BranchCovCountsWriteInterval("branch-cov-counts-write-interval",
-                     cl::desc("Approximate number of seconds between run.branches writes (default: 5.0)"),
+                     cl::desc("Approximate number of seconds between run.branches writes (default: 5.0s)"),
                      cl::init(5.));
   */
 
   // XXX I really would like to have dynamic rate control for something like this.
   cl::opt<double>
   UncoveredUpdateInterval("uncovered-update-interval",
-                          cl::init(30.));
+                          cl::init(30.),
+			  cl::desc("(default=30.0s)"));
   
   cl::opt<bool>
   UseCallPaths("use-call-paths",
-               cl::desc("Enable calltree tracking for instruction level statistics"),
-               cl::init(true));
+	       cl::init(true),
+               cl::desc("Enable calltree tracking for instruction level statistics (default=on)"));
   
 }
 
@@ -404,11 +406,7 @@ void StatsTracker::writeStatsLine() {
              << "," << numBranches
              << "," << util::getUserTime()
              << "," << executor.states.size()
-#if LLVM_VERSION_CODE > LLVM_VERSION(3, 2)
-             << "," << sys::Process::GetMallocUsage()
-#else
-             << "," << sys::Process::GetTotalMemoryUsage()
-#endif
+             << "," << util::GetTotalMallocUsage()
              << "," << stats::queries
              << "," << stats::queryConstructs
              << "," << 0 // was numObjects

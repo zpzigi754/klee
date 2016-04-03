@@ -18,6 +18,9 @@
 /* Does the platform use __ctype_b_loc, etc. */
 #undef HAVE_CTYPE_EXTERNALS
 
+/* Define to 1 if you have the <gperftools/malloc_extension.h> header file. */
+#undef HAVE_GPERFTOOLS_MALLOC_EXTENSION_H
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
@@ -65,6 +68,10 @@
 
 /* Z3 needs a Z3_context passed to Z3_get_error_msg() */
 #undef HAVE_Z3_GET_ERROR_MSG_NEEDS_CONTEXT
+
+/* Define to empty or 'const' depending on how SELinux qualifies its security
+   context parameters. */
+#undef KLEE_SELINUX_CTX_CONST
 
 /* LLVM version is release (instead of development) */
 #undef LLVM_IS_RELEASE

@@ -1,7 +1,7 @@
 dnl **************************************************************************
 dnl * Initialize
 dnl **************************************************************************
-AC_INIT([[KLEE]],[[1.1.0]],[[klee-dev@imperial.ac.uk]],[[klee-]],[[https://klee.github.io]])
+AC_INIT([[KLEE]],[[1.2.0]],[[klee-dev@imperial.ac.uk]],[[klee-]],[[https://klee.github.io]])
 
 dnl Identify where LLVM source tree is (this is patched by
 dnl AutoRegen.sh)
@@ -534,11 +534,30 @@ if test "x${have_cap}" = xno; then
 capability checking support for klee-replay.])
 fi
 
-AC_LANG_POP([C])
-
 AC_CHECK_HEADERS([selinux/selinux.h],
         AC_SUBST(HAVE_SELINUX, 1),
         AC_SUBST(HAVE_SELINUX, 0))
+
+if test "$HAVE_SELINUX" = "1"; then
+   # Test what function signature we need to use for SELinux. The signatures
+   # have changed between 2.2 and 2.3. In particular, the type of the "security
+   # context" parameter was changed from char * to const char *, with this
+   # patch: [PATCH] Get rid of security_context_t and fix const declarations.
+   # [http://www.spinics.net/lists/selinux/msg14827.html]
+   AC_CACHE_CHECK([for selinux security context type constness],
+                  [klee_cv_sel_ctx_const],
+   [AC_COMPILE_IFELSE(
+     [AC_LANG_PROGRAM([[
+#include <selinux/selinux.h>
+int setcon(char *context);]])],
+     [klee_cv_sel_ctx_const=''],
+     [klee_cv_sel_ctx_const='const'])])
+   AC_DEFINE_UNQUOTED([KLEE_SELINUX_CTX_CONST], [$klee_cv_sel_ctx_const],
+     [Define to empty or 'const' depending on how SELinux qualifies its
+      security context parameters.])
+fi
+
+AC_LANG_POP([C])
 
 dnl **************************************************************************
 dnl Test for features
@@ -548,6 +567,41 @@ AC_CHECK_HEADERS([malloc/malloc.h])
 AC_CHECK_FUNCS([malloc_zone_statistics])
 AC_SEARCH_LIBS(mallinfo,malloc,
                AC_DEFINE([HAVE_MALLINFO],[1],[Define if mallinfo() is available on this platform.]))
+
+dnl **************************************************************************
+dnl Test for tcmalloc
+dnl **************************************************************************
+
+AC_ARG_WITH([tcmalloc],
+	    AS_HELP_STRING([--without-tcmalloc], [Ignore presence of tcmalloc and disable it (default=detect)]))
+
+AS_IF([test "x$with_tcmalloc" != "xno"],
+      AC_CHECK_HEADERS([gperftools/malloc_extension.h],
+		       [have_tcmalloc=yes], [have_tcmalloc=no]),
+      [have_tcmalloc=no])
+
+AS_IF([test "x$have_tcmalloc" = "xyes"],
+      [
+	AC_SEARCH_LIBS(tc_malloc,tcmalloc_minimal,
+		     [
+		      AC_SUBST(HAVE_TCMALLOC, 1)
+		      if test "${ac_cv_search_tc_malloc}" != "none required"; then
+			 TCMALLOC_LIB=${ac_cv_search_tc_malloc}
+			 AC_SUBST(TCMALLOC_LIB)
+		      fi
+		     ],
+		     [
+		      AC_MSG_WARN([Could not link with tcmalloc])
+		      AC_SUBST(HAVE_TCMALLOC, 0)
+		     ],)
+
+       ],
+      [AS_IF([test "x$with_tcmalloc" = "xyes"],
+	     [AC_MSG_ERROR([tcmalloc requested but not found])],
+	     [
+	      AC_SUBST(HAVE_TCMALLOC, 0)
+	      ])
+])
 
 dnl **************************************************************************
 dnl Find an install of STP
