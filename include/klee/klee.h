@@ -10,6 +10,7 @@
 #ifndef __KLEE_H__
 #define __KLEE_H__
 
+#include <assert.h>
 #include "stdint.h"
 #include "stddef.h"
 
@@ -107,6 +108,10 @@ extern "C" {
      and may have peculiar semantics. */
 
   void klee_assume(uintptr_t condition);
+  inline void klee_note(uintptr_t condition) {
+    klee_assert(condition);
+    klee_assume(condition);
+  }
   void klee_warning(const char *message);
   void klee_warning_once(const char *message);
   void klee_prefer_cex(void *object, uintptr_t condition);
