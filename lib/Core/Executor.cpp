@@ -151,6 +151,12 @@ namespace {
   cl::opt<bool>
   DebugCheckForImpliedValues("debug-check-for-implied-values");
 
+  cl::opt<bool>
+  DebugReportSymbdex("debug-report-symbdex",
+                     cl::desc("print stack trace for each symbolic "
+                              "indexing occurence (symbdex may "
+                              "considerably slow down symbolic "
+                              "execution)"));
 
   cl::opt<bool>
   SimplifySymIndices("simplify-sym-indices",
@@ -3434,11 +3440,13 @@ void Executor::executeMemoryOperation(ExecutionState &state,
       value = state.constraints.simplifyExpr(value);
   }
 
-  if (!isa<ConstantExpr>(address)) {
-    printf("\n");
-    printf("Some symbolic indexing going on here:\n");
-    llvm::errs() << state.pc->getSourceLocation();
-    state.dumpStack(llvm::errs());
+  if (DebugReportSymbdex) {
+    if (!isa<ConstantExpr>(address)) {
+      printf("\n");
+      printf("Some symbolic indexing going on here:\n");
+      llvm::errs() << state.pc->getSourceLocation();
+      state.dumpStack(llvm::errs());
+    }
   }
 
   // fast path: single in-bounds resolution
