@@ -624,6 +624,7 @@ ac_includes_default="\
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+METASMT_DEFAULT_BACKEND
 ENABLE_METASMT
 METASMT_ROOT
 Z3_LDFLAGS
@@ -632,6 +633,8 @@ ENABLE_Z3
 STP_LDFLAGS
 STP_CFLAGS
 ENABLE_STP
+ZLIB_LIB
+HAVE_ZLIB
 TCMALLOC_LIB
 HAVE_TCMALLOC
 CXXCPP
@@ -736,9 +739,11 @@ with_uclibc
 enable_posix_runtime
 with_runtime
 with_tcmalloc
+with_zlib
 with_stp
 with_z3
 with_metasmt
+with_metasmt_default_backend
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1390,9 +1395,14 @@ Optional Packages:
                           (default [Release+Asserts])
   --without-tcmalloc      Ignore presence of tcmalloc and disable it
                           (default=detect)
+  --without-zlib          Ignore presence of zlib and disable it
+                          (default=detect)
   --with-stp              Location of STP installation directory
   --with-z3               Location of Z3 installation directory
   --with-metasmt          Location of metaSMT installation directory
+  --with-metasmt-default-backend
+                          Default backend of metaSMT (btor|stp|z3, stp if
+                          unspecified)
 
 Some influential environment variables:
   CC          C compiler command
@@ -5029,6 +5039,119 @@ fi
 fi
 
 
+
+# Check whether --with-zlib was given.
+if test "${with_zlib+set}" = set; then :
+  withval=$with_zlib;
+fi
+
+
+if test "x$with_zlib" != "xno"; then :
+  for ac_header in zlib.h
+do :
+  ac_fn_cxx_check_header_mongrel "$LINENO" "zlib.h" "ac_cv_header_zlib_h" "$ac_includes_default"
+if test "x$ac_cv_header_zlib_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_ZLIB_H 1
+_ACEOF
+ have_zlib=yes
+else
+  have_zlib=no
+fi
+
+done
+
+else
+  have_zlib=no
+fi
+
+if test "x$have_zlib" = "xyes"; then :
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing deflateEnd" >&5
+$as_echo_n "checking for library containing deflateEnd... " >&6; }
+if ${ac_cv_search_deflateEnd+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char deflateEnd ();
+int
+main ()
+{
+return deflateEnd ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' z; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_search_deflateEnd=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_deflateEnd+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_deflateEnd+:} false; then :
+
+else
+  ac_cv_search_deflateEnd=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_deflateEnd" >&5
+$as_echo "$ac_cv_search_deflateEnd" >&6; }
+ac_res=$ac_cv_search_deflateEnd
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+              HAVE_ZLIB=1
+
+              if test "${ac_cv_search_zlib}" != "none required"; then
+             ZLIB_LIB=${ac_cv_search_zlib}
+
+              fi
+
+else
+
+              { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Could not link with zlib" >&5
+$as_echo "$as_me: WARNING: Could not link with zlib" >&2;}
+              HAVE_ZLIB=0
+
+
+fi
+
+
+
+else
+  if test "x$with_zlib" = "xyes"; then :
+  as_fn_error $? "zlib requested but not found" "$LINENO" 5
+else
+
+          HAVE_ZLIB=0
+
+
+fi
+
+fi
+
+
 ENABLE_STP=0
 
 # Check whether --with-stp was given.
@@ -5324,7 +5447,6 @@ if test "${with_metasmt+set}" = set; then :
   withval=$with_metasmt;
 fi
 
-
 if test X$with_metasmt = X ; then
   ENABLE_METASMT=0
   { $as_echo "$as_me:${as_lineno-$LINENO}: Not using MetaSMT solver backend" >&5
@@ -5384,12 +5506,54 @@ $as_echo "#define ENABLE_METASMT 1" >>confdefs.h
 
   METASMT_ROOT=$metasmt_root
 
-  REQUIRES_RTTI=1
-
   ENABLE_METASMT=1
   { $as_echo "$as_me:${as_lineno-$LINENO}: Using MetaSMT solver backend" >&5
 $as_echo "$as_me: Using MetaSMT solver backend" >&6;}
 fi
+
+
+
+
+
+
+# Check whether --with-metasmt-default-backend was given.
+if test "${with_metasmt_default_backend+set}" = set; then :
+  withval=$with_metasmt_default_backend;
+fi
+
+
+if test "X$with_metasmt_default_backend" != X ; then
+  if test "X$ENABLE_METASMT" != X1 ; then
+    as_fn_error $? "--with-metasmt-default-backend requires metaSMT to be enabled" "$LINENO" 5
+  fi
+  if test "$with_metasmt_default_backend" == "btor" ; then
+    METASMT_DEFAULT_BACKEND=BTOR
+    { $as_echo "$as_me:${as_lineno-$LINENO}: metaSMT uses Boolector as default backend" >&5
+$as_echo "$as_me: metaSMT uses Boolector as default backend" >&6;}
+  fi
+  if test "$with_metasmt_default_backend" == "z3" ; then
+    METASMT_DEFAULT_BACKEND=Z3
+    { $as_echo "$as_me:${as_lineno-$LINENO}: metaSMT uses Z3 as default backend" >&5
+$as_echo "$as_me: metaSMT uses Z3 as default backend" >&6;}
+  fi
+  if test "$with_metasmt_default_backend" == "stp" ; then
+    METASMT_DEFAULT_BACKEND=STP
+    { $as_echo "$as_me:${as_lineno-$LINENO}: metaSMT uses STP as default backend" >&5
+$as_echo "$as_me: metaSMT uses STP as default backend" >&6;}
+  fi
+  if test "X$METASMT_DEFAULT_BACKEND" == X ; then
+    METASMT_DEFAULT_BACKEND=STP
+    { $as_echo "$as_me:${as_lineno-$LINENO}: $with_metasmt_default_backend unsupported, metaSMT uses STP as default backend" >&5
+$as_echo "$as_me: $with_metasmt_default_backend unsupported, metaSMT uses STP as default backend" >&6;}
+  fi
+else
+  if test "X$ENABLE_METASMT" == X1 ; then
+    METASMT_DEFAULT_BACKEND=STP
+    { $as_echo "$as_me:${as_lineno-$LINENO}: No solver specified, metaSMT uses STP as default backend" >&5
+$as_echo "$as_me: No solver specified, metaSMT uses STP as default backend" >&6;}
+  fi
+fi
+
 
 
 

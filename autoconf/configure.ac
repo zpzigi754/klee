@@ -604,6 +604,41 @@ AS_IF([test "x$have_tcmalloc" = "xyes"],
 ])
 
 dnl **************************************************************************
+dnl Test for zlib
+dnl **************************************************************************
+
+AC_ARG_WITH([zlib],
+        AS_HELP_STRING([--without-zlib], [Ignore presence of zlib and disable it (default=detect)]))
+
+AS_IF([test "x$with_zlib" != "xno"],
+      AC_CHECK_HEADERS([zlib.h],
+               [have_zlib=yes], [have_zlib=no]),
+      [have_zlib=no])
+
+AS_IF([test "x$have_zlib" = "xyes"],
+      [
+    AC_SEARCH_LIBS(deflateEnd, z,
+             [
+              AC_SUBST(HAVE_ZLIB, 1)
+              if test "${ac_cv_search_zlib}" != "none required"; then
+             ZLIB_LIB=${ac_cv_search_zlib}
+             AC_SUBST(ZLIB_LIB)
+              fi
+             ],
+             [
+              AC_MSG_WARN([Could not link with zlib])
+              AC_SUBST(HAVE_ZLIB, 0)
+             ],)
+
+       ],
+      [AS_IF([test "x$with_zlib" = "xyes"],
+         [AC_MSG_ERROR([zlib requested but not found])],
+         [
+          AC_SUBST(HAVE_ZLIB, 0)
+          ])
+])
+
+dnl **************************************************************************
 dnl Find an install of STP
 dnl **************************************************************************
 
@@ -742,7 +777,6 @@ dnl **************************************************************************
 AC_ARG_WITH(metasmt,
   AS_HELP_STRING([--with-metasmt],
     [Location of metaSMT installation directory]),,)
-
 if test X$with_metasmt = X ; then
   ENABLE_METASMT=0
   AC_MSG_NOTICE([Not using MetaSMT solver backend])
@@ -769,12 +803,50 @@ else
 
   AC_DEFINE(ENABLE_METASMT, 1, [Enable metaSMT API])
   AC_SUBST(METASMT_ROOT,$metasmt_root)
-  AC_SUBST(REQUIRES_RTTI,[[1]])
   ENABLE_METASMT=1
   AC_MSG_NOTICE([Using MetaSMT solver backend])
 fi
 
 AC_SUBST(ENABLE_METASMT)
+
+
+dnl **************************************************************************
+dnl User option to specify the default backend of metaSMT
+dnl **************************************************************************
+
+AC_ARG_WITH(metasmt-default-backend,
+  AS_HELP_STRING([--with-metasmt-default-backend],
+    [Default backend of metaSMT (btor|stp|z3, stp if unspecified)]),,)
+
+if test "X$with_metasmt_default_backend" != X ; then
+  if test "X$ENABLE_METASMT" != X1 ; then
+    AC_MSG_ERROR([--with-metasmt-default-backend requires metaSMT to be enabled])
+  fi
+  if test "$with_metasmt_default_backend" == "btor" ; then
+    METASMT_DEFAULT_BACKEND=BTOR
+    AC_MSG_NOTICE([metaSMT uses Boolector as default backend])
+  fi
+  if test "$with_metasmt_default_backend" == "z3" ; then
+    METASMT_DEFAULT_BACKEND=Z3
+    AC_MSG_NOTICE([metaSMT uses Z3 as default backend])
+  fi
+  if test "$with_metasmt_default_backend" == "stp" ; then
+    METASMT_DEFAULT_BACKEND=STP
+    AC_MSG_NOTICE([metaSMT uses STP as default backend])
+  fi
+  if test "X$METASMT_DEFAULT_BACKEND" == X ; then
+    METASMT_DEFAULT_BACKEND=STP
+    AC_MSG_NOTICE([$with_metasmt_default_backend unsupported, metaSMT uses STP as default backend])
+  fi
+else
+  if test "X$ENABLE_METASMT" == X1 ; then
+    METASMT_DEFAULT_BACKEND=STP
+    AC_MSG_NOTICE([No solver specified, metaSMT uses STP as default backend])
+  fi  
+fi
+
+AC_SUBST(METASMT_DEFAULT_BACKEND)
+
 
 dnl **************************************************************************
 dnl Check at least one solver backend is enabled
