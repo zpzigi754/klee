@@ -215,6 +215,8 @@ public:
   void flushToConcreteStore(TimingSolver *solver,
                             const ExecutionState &state) const;
 
+  void symbolize();
+
 private:
   const UpdateList &getUpdates() const;
 
@@ -243,7 +245,7 @@ private:
 
   ArrayCache *getArrayCache() const;
 };
-  
+
 } // End klee namespace
 
 #endif

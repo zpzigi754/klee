@@ -562,6 +562,21 @@ void ExecutionState::traceRetPtrNestedField(int base_offset,
   ret->fields[base_offset].fields[offset] = descr;
 }
 
+void ExecutionState::symbolizeConcretes() {
+
+  for (MemoryMap::iterator obj_I = addressSpace.objects.begin(),
+         obj_E = addressSpace.objects.end(); obj_I != obj_E; ++obj_I) {
+    const MemoryObject *mo = obj_I->first;
+    ObjectState *os = obj_I->second;
+    if (!os->readOnly) {
+      llvm::errs() << "this one is RO:" <<os->getObject()->name <<"\n";
+    } else {
+      ObjectState *osw = addressSpace.getWriteable(mo, os);
+      osw->symbolize();
+    }
+  }
+}
+
 bool FieldDescr::eq(const FieldDescr& other) const {
   return width == other.width &&
     name == other.name &&
