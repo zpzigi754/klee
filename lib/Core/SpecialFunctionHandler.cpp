@@ -127,6 +127,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_trace_ret_ptr_field", handleTraceRetPtrField, false),
   add("klee_trace_param_ptr_nested_field", handleTraceParamPtrNestedField, false),
   add("klee_trace_ret_ptr_nested_field", handleTraceRetPtrNestedField, false),
+  add("klee_forget", handleForget, false),
 
   // operator delete[](void*)
   add("_ZdaPv", handleDeleteArray, false),
@@ -944,9 +945,17 @@ void SpecialFunctionHandler::handleTraceParamPtr(ExecutionState &state,
   std::string name = readStringAtAddress(state, arguments[2]);
   state.traceArgPtr(arguments[0], width, name);
 }
+
 void SpecialFunctionHandler::handleTraceParamFPtr(ExecutionState &state,
-                                              KInstruction *target,
-                                              std::vector<ref<Expr> > &arguments) {
+                                                  KInstruction *target,
+                                                  std::vector<ref<Expr> > &arguments) {
   std::string name = readStringAtAddress(state, arguments[1]);
   state.traceArgFunPtr(arguments[0], name);
+}
+
+void SpecialFunctionHandler::handleForget(ExecutionState &state,
+                                          KInstruction *target,
+                                          std::vector<ref<Expr> > &arguments) {
+  state.constraints.clear();
+  state.symbolizeConcretes();
 }
