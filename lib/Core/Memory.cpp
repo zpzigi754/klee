@@ -256,6 +256,24 @@ void ObjectState::makeSymbolic() {
   }
 }
 
+void ObjectState::symbolize() {
+  static unsigned id = 0;
+  llvm::errs() << "symbolizing " <<getObject()->name
+               <<"(" << size << ")\n";
+  assert(size != 0);
+  const Array *array =
+    getArrayCache()->CreateArray("reset_arr" + llvm::utostr(++id),
+                                 size);
+  UpdateList ul(array, 0);
+  for (unsigned i=0; i<size; i++) {
+    markByteSymbolic(i);
+    ref<Expr> read = ReadExpr::create(ul, ConstantExpr::alloc(i, Expr::Int32));
+    setKnownSymbolic(i, read.get());
+  }
+  if (flushMask) delete flushMask;
+  flushMask = 0;
+}
+
 void ObjectState::initializeToZero() {
   makeConcrete();
   memset(concreteStore, 0, size);

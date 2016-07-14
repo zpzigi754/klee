@@ -246,6 +246,7 @@ public:
   void traceRetPtrNestedField(int base_offset, int offset,
                               Expr::Width width, std::string name);
 
+  void symbolizeConcretes();
   std::vector<ref<Expr> > relevantConstraints(SymbolSet symbols) const;
 };
 }

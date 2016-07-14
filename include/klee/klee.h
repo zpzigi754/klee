@@ -181,6 +181,8 @@ extern "C" {
   void klee_trace_ret_ptr_nested_field(int base_offset,
                                        int offset, int width, char* name);
 
+  void klee_forget();
+
 #ifdef __cplusplus
 }
 #endif
