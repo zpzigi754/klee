@@ -98,6 +98,7 @@ ObjectState::ObjectState(const MemoryObject *mo)
     object(mo),
     concreteStore(new uint8_t[mo->size]),
     concreteMask(0),
+    unforgettableMask(0),
     flushMask(0),
     knownSymbolics(0),
     updates(0, 0),
@@ -120,6 +121,7 @@ ObjectState::ObjectState(const MemoryObject *mo, const Array *array)
     object(mo),
     concreteStore(new uint8_t[mo->size]),
     concreteMask(0),
+    unforgettableMask(0),
     flushMask(0),
     knownSymbolics(0),
     updates(array, 0),
@@ -136,6 +138,8 @@ ObjectState::ObjectState(const ObjectState &os)
     object(os.object),
     concreteStore(new uint8_t[os.size]),
     concreteMask(os.concreteMask ? new BitArray(*os.concreteMask, os.size) : 0),
+    unforgettableMask(os.unforgettableMask ? new BitArray(*os.unforgettableMask,
+                                                          os.size) : 0),
     flushMask(os.flushMask ? new BitArray(*os.flushMask, os.size) : 0),
     knownSymbolics(0),
     updates(os.updates),
@@ -155,9 +159,10 @@ ObjectState::ObjectState(const ObjectState &os)
 }
 
 ObjectState::~ObjectState() {
-  delete concreteMask;
-  delete flushMask;
-  delete[] knownSymbolics;
+  if (concreteMask) delete concreteMask;
+  if (flushMask) delete flushMask;
+  if (knownSymbolics) delete[] knownSymbolics;
+  if (unforgettableMask) delete unforgettableMask;
   delete[] concreteStore;
 
   if (object)
@@ -246,12 +251,14 @@ void ObjectState::flushToConcreteStore(TimingSolver *solver,
 }
 
 void ObjectState::makeConcrete() {
-  delete concreteMask;
-  delete flushMask;
-  delete[] knownSymbolics;
+  if (concreteMask) delete concreteMask;
+  if (flushMask) delete flushMask;
+  if (knownSymbolics) delete[] knownSymbolics;
+  if (unforgettableMask) delete unforgettableMask;
   concreteMask = 0;
   flushMask = 0;
   knownSymbolics = 0;
+  unforgettableMask = 0;
 }
 
 void ObjectState::makeSymbolic() {
@@ -266,22 +273,52 @@ void ObjectState::makeSymbolic() {
   }
 }
 
-void ObjectState::symbolize() {
+void ObjectState::setUnforgettable(unsigned offset, Expr::Width width) {
+  if (!unforgettableMask) unforgettableMask = new BitArray(size, false);
+
+  assert(offset + width/8 <= size);
+  for (unsigned end = offset + width/8; offset < end; ++offset) {
+    unforgettableMask->set(offset);
+  }
+}
+
+void ObjectState::resetUnforgettable() {
+  if (unforgettableMask) delete unforgettableMask;
+  unforgettableMask = 0;
+}
+
+void ObjectState::forgetAll() {
   static unsigned id = 0;
-  llvm::errs() << "symbolizing " <<getObject()->name
-               <<"(" << size << ")\n";
-  assert(size != 0);
+  // Nothing to forget
+  //if (unforgettableMask && unforgettableMask->allOnes()) return;
+  //assert(size != 0); //TODO: why size can ever be 0?
+  if (size == 0) return;
+  llvm::errs() << " forgetting ["
+               << object->isGlobal
+               << object->isLocal
+               << object->isFixed
+               << object->fake_object
+               << object->isUserSpecified << "]:";
   const Array *array =
     getArrayCache()->CreateArray("reset_arr" + llvm::utostr(++id),
                                  size);
   UpdateList ul(array, 0);
   for (unsigned i=0; i<size; i++) {
+    if (unforgettableMask && unforgettableMask->get(i)) continue;
+    ref<Expr> tmp = read8(i);
+    if (isa<ConstantExpr>(tmp)) {
+      llvm::errs() << tmp <<"("
+                   <<(char)(dyn_cast<ConstantExpr>(tmp))->getZExtValue()
+                   <<"), ";
+    } else
+      llvm::errs() << tmp <<", ";
     markByteSymbolic(i);
     ref<Expr> read = ReadExpr::create(ul, ConstantExpr::alloc(i, Expr::Int32));
     setKnownSymbolic(i, read.get());
   }
   if (flushMask) delete flushMask;
   flushMask = 0;
+  llvm::errs() << "\n";
 }
 
 void ObjectState::initializeToZero() {

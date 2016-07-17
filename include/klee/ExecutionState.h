@@ -253,6 +253,8 @@ public:
   void traceRetPtrNestedField(int base_offset, int offset,
                               Expr::Width width, std::string name);
 
+  void doNotResetThis(const ref<ConstantExpr> &addr,
+                      Expr::Width w);
   void symbolizeConcretes();
   std::vector<ref<Expr> > relevantConstraints(SymbolSet symbols) const;
 };
