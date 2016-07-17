@@ -3819,3 +3819,11 @@ Interpreter *Interpreter::create(const InterpreterOptions &opts,
                                  InterpreterHandler *ih) {
   return new Executor(opts, ih);
 }
+
+void Executor::induceInvariantsForThisLoop(ExecutionState &state,
+                                           KInstruction *target)
+{
+  //... the magick here ...
+
+  bindLocal(target, state, ConstantExpr::create(1, Expr::Bool));
+}

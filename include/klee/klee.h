@@ -184,6 +184,8 @@ extern "C" {
   void klee_remember(void* adr, int width);
   void klee_forget_the_rest();
 
+  int klee_induce_invariants();
+
 #ifdef __cplusplus
 }
 #endif
