@@ -150,6 +150,7 @@ namespace klee {
     HANDLER(handleTraceRetPtrNestedField);
     HANDLER(handleRemember);
     HANDLER(handleForgetTheRest);
+    HANDLER(handleInduceInvariants);
 #undef HANDLER
   };
 } // End klee namespace

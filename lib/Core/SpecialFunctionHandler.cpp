@@ -129,6 +129,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_trace_ret_ptr_nested_field", handleTraceRetPtrNestedField, false),
   add("klee_remember", handleRemember, false),
   add("klee_forget_the_rest", handleForgetTheRest, false),
+  add("klee_induce_invariants", handleInduceInvariants, false),
 
   // operator delete[](void*)
   add("_ZdaPv", handleDeleteArray, false),
@@ -971,4 +972,9 @@ void SpecialFunctionHandler::handleForgetTheRest
 (ExecutionState &state, KInstruction *target, std::vector<ref<Expr> > &arguments) {
   state.constraints.clear();
   state.symbolizeConcretes();
+}
+
+void SpecialFunctionHandler::handleInduceInvariants
+(ExecutionState &state, KInstruction *target, std::vector<ref<Expr> > &arguments) {
+  executor.induceInvariantsForThisLoop(state, target);
 }
