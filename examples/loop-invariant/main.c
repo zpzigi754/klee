@@ -3,13 +3,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+int glo = 42;
+
 int main() {
   int x = klee_int("x");
   int y = klee_int("y");
   int z = 10;
   klee_assume(y==5);
   if (3 < x) {
-    klee_forget();
+    klee_forget_the_rest();
     if (3 < x) {
       printf("bigger\n");
     } else {
