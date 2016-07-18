@@ -19,6 +19,9 @@
 #include "../../lib/Core/AddressSpace.h"
 #include "klee/Internal/Module/KInstIterator.h"
 
+//TODO: generalize for otehr LLVM versions like the above
+#include <llvm/Analysis/LoopInfo.h>
+
 #include <map>
 #include <set>
 #include <vector>
@@ -119,6 +122,17 @@ struct CallInfo {
   SymbolSet computeRetSymbolSet() const;
 };
 
+class ExecutionState;
+
+/// @brief LoopInProcess keeps all the necessary information for
+/// dynamic loop invariant deduction.
+struct LoopInProcess {
+  int refCount; // for the ref class.
+  llvm::Loop *loop;
+
+  ExecutionState *headerExecutionState;
+};
+
 /// @brief ExecutionState representing a path under exploration
 class ExecutionState {
 public:
@@ -151,6 +165,9 @@ public:
 
   /// @brief Address space used by this state (e.g. Global and Heap)
   AddressSpace addressSpace;
+
+  /// @brief Information necessary for loop invariant induction.
+  ref<LoopInProcess> loopInProcess;
 
   /// @brief Constraints collected so far
   ConstraintManager constraints;
