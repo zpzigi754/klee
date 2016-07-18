@@ -13,6 +13,9 @@
 #include "klee/Config/Version.h"
 #include "klee/Interpreter.h"
 
+//TODO: generalize for otehr LLVM versions like the above
+#include <llvm/Analysis/LoopInfo.h>
+
 #include <map>
 #include <set>
 #include <vector>
@@ -45,6 +48,10 @@ namespace klee {
     KInstruction **instructions;
 
     std::map<llvm::BasicBlock*, unsigned> basicBlockEntry;
+
+    /// Loop information is automatically calculated on initialization
+    typedef llvm::LoopInfoBase<llvm::BasicBlock, llvm::Loop> LInfo;
+    LInfo loopInfo;
 
     /// Whether instructions in this function should count as
     /// "coverable" for statistics and search heuristics.
