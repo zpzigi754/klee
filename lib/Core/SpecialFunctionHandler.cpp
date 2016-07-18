@@ -125,7 +125,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_trace_ret_ptr_nested_field", handleTraceRetPtrNestedField, false),
   add("klee_remember", handleRemember, false),
   add("klee_forget_the_rest", handleForgetTheRest, false),
-  add("klee_induce_invariants", handleInduceInvariants, false),
+  add("klee_induce_invariants", handleInduceInvariants, true),
 
   // operator delete[](void*)
   add("_ZdaPv", handleDeleteArray, false),
