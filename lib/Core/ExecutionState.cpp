@@ -752,3 +752,8 @@ SymbolSet CallInfo::computeSymbolicVariablesSet() const {
   return symbols;
 }
 
+LoopInProcess::LoopInProcess(llvm::Loop *_loop,
+                             const ExecutionState &_headerState)
+  :loop(_loop), unfinishedPaths(1), headerAddressSpace(_headerState.addressSpace)
+{
+}
