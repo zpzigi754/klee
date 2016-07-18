@@ -95,7 +95,6 @@
 
 //TODO: generalize for otehr LLVM versions like the above
 #include <llvm/Analysis/LoopInfo.h>
-#include <llvm/PassManager.h>
 #include <llvm/Analysis/Dominators.h>
 
 
@@ -3839,17 +3838,10 @@ void Executor::induceInvariantsForThisLoop(ExecutionState &state,
   BasicBlock *bb = linst->getParent();
   assert(bb);
   llvm::Function *f = bb->getParent();
-  llvm::DominatorTreeBase<llvm::BasicBlock> dt(false);
-  dt.recalculate(*f);
-  llvm::LoopInfoBase<llvm::BasicBlock, llvm::Loop> loopInfo;
-  loopInfo.Analyze(dt);
+  const KFunction::LInfo &loopInfo = kmodule->functionMap[f]->loopInfo;
   loopInfo.print(llvm::errs());
-
-
   Loop* loop = loopInfo.getLoopFor(bb);
 
-  llvm::errs() <<"here" <<"\n";
-  loopInfo.print(llvm::errs());
   assert(!loopInfo.empty());
   assert(loop);
   assert(loopInfo.isLoopHeader(bb) &&
