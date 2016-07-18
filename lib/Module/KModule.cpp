@@ -379,6 +379,12 @@ KFunction::KFunction(llvm::Function *_function,
     numArgs(function->arg_size()),
     numInstructions(0),
     trackCoverage(true) {
+
+  // Build loop info, for loop-invariant deduction.
+  llvm::DominatorTreeBase<llvm::BasicBlock> dt(false);
+  dt.recalculate(*function);
+  loopInfo.Analyze(dt);
+
   for (llvm::Function::iterator bbit = function->begin(), 
          bbie = function->end(); bbit != bbie; ++bbit) {
     BasicBlock *bb = &*bbit;
