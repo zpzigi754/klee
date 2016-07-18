@@ -46,10 +46,6 @@
 #endif
 
 
-//TODO: generalize for otehr LLVM versions like the above
-#include "llvm/Analysis/LoopInfo.h"
-#include "llvm/PassManager.h"
-
 #include <dirent.h>
 #include <signal.h>
 #include <unistd.h>
@@ -1711,10 +1707,6 @@ int main(int argc, char **argv, char **envp) {
     klee_message("Linking in library: %s.\n", libFilename);
     mainModule = klee::linkWithLibrary(mainModule, libFilename);
   }
-  //Mark the loops.
-  PassManager PM;
-  PM.add(new LoopInfo);
-  PM.run(*mainModule);
 
   // Get the desired main function.  klee_main initializes uClibc
   // locale and other data and then calls main.

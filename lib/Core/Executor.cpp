@@ -78,6 +78,12 @@
 #include "klee/Internal/Support/CompressionStream.h"
 #endif
 
+//TODO: generalize for otehr LLVM versions like the above
+#include <llvm/Analysis/LoopInfo.h>
+#include <llvm/PassManager.h>
+#include <llvm/Analysis/Dominators.h>
+
+
 #include <cassert>
 #include <algorithm>
 #include <iomanip>
@@ -423,7 +429,7 @@ const Module *Executor::setModule(llvm::Module *module,
                        interpreterHandler->getOutputFilename("assembly.ll"),
                        userSearcherRequiresMD2U());
   }
-  
+
   return module;
 }
 
@@ -3978,6 +3984,34 @@ void Executor::induceInvariantsForThisLoop(ExecutionState &state,
 {
   //TODO
   //... the magick here ...
+
+  KInstruction *inst = state.prevPC;
+  llvm::Instruction *linst = inst->inst;
+  assert(linst);
+  llvm::errs() <<linst->getOpcodeName() <<"\n";
+  BasicBlock *bb = linst->getParent();
+  assert(bb);
+  llvm::Function *f = bb->getParent();
+  llvm::DominatorTreeBase<llvm::BasicBlock> dt(false);
+  dt.recalculate(*f);
+  llvm::LoopInfoBase<llvm::BasicBlock, llvm::Loop> loopInfo;
+  loopInfo.Analyze(dt);
+  loopInfo.print(llvm::errs());
+
+
+  Loop* loop = loopInfo.getLoopFor(bb);
+
+  llvm::errs() <<"here" <<"\n";
+  loopInfo.print(llvm::errs());
+  assert(!loopInfo.empty());
+  assert(loop);
+  assert(loopInfo.isLoopHeader(bb) &&
+         "The klee_induce_invariants must be placed into the condition"
+         " of a loop.");
+
+  state.loopInProcess = new LoopInProcess;
+  state.loopInProcess->loop = loop;
+  state.loopInProcess->headerExecutionState = state.branch();
 
   bindLocal(target, state, ConstantExpr::create(1, Expr::Int32));
 }
