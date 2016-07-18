@@ -3831,6 +3831,11 @@ void Executor::induceInvariantsForThisLoop(ExecutionState &state,
   //TODO
   //... the magick here ...
 
+  //TODO: we may use an additional field to keep the previous
+  // loopInProcess.
+  assert(!state.loopInProcess.isNull() &&
+         "Do not support nested loops for invariant induction");
+
   KInstruction *inst = state.prevPC;
   llvm::Instruction *linst = inst->inst;
   assert(linst);
@@ -3848,9 +3853,7 @@ void Executor::induceInvariantsForThisLoop(ExecutionState &state,
          "The klee_induce_invariants must be placed into the condition"
          " of a loop.");
 
-  state.loopInProcess = new LoopInProcess;
-  state.loopInProcess->loop = loop;
-  state.loopInProcess->headerExecutionState = state.branch();
+  state.loopInProcess = new LoopInProcess(loop, state);
 
   bindLocal(target, state, ConstantExpr::create(1, Expr::Int32));
 }

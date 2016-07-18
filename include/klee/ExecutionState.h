@@ -126,11 +126,20 @@ class ExecutionState;
 
 /// @brief LoopInProcess keeps all the necessary information for
 /// dynamic loop invariant deduction.
-struct LoopInProcess {
+class LoopInProcess {
+public:
   int refCount; // for the ref class.
-  llvm::Loop *loop;
+private:
+  const llvm::Loop *loop; //Owner: KFunction::loopInfo
 
-  ExecutionState *headerExecutionState;
+  int unfinishedPaths;
+  std::vector<AddressSpace> backEdgeMemories;
+
+  AddressSpace headerAddressSpace;
+
+public:
+  LoopInProcess(llvm::Loop *_loop, const ExecutionState &_headerState);
+
 };
 
 /// @brief ExecutionState representing a path under exploration
