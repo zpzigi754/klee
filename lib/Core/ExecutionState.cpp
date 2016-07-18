@@ -107,6 +107,7 @@ ExecutionState::ExecutionState(const ExecutionState& state):
     incomingBBIndex(state.incomingBBIndex),
 
     addressSpace(state.addressSpace),
+    loopInProcess(state.loopInProcess) ,
     constraints(state.constraints),
 
     queryCost(state.queryCost),
@@ -201,6 +202,12 @@ bool ExecutionState::merge(const ExecutionState &b) {
                  << "--\n";
   if (pc != b.pc)
     return false;
+
+  if ((!loopInProcess.isNull()) || !b.loopInProcess.isNull()) {
+    llvm::errs() <<"-- Loop in process: merge unsupported "
+                 << "for loop invariant analysis.\n";
+    return false;
+  }
 
   // XXX is it even possible for these to differ? does it matter? probably
   // implies difference in object states?
