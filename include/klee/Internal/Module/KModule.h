@@ -56,6 +56,9 @@ namespace klee {
     /// Loop information is automatically calculated on initialization
     typedef llvm::LoopInfoBase<llvm::BasicBlock, llvm::Loop> LInfo;
     LInfo loopInfo;
+    /// Keep track of the loops that were analyzed on the subject of
+    /// the invariants.
+    std::set<const llvm::Loop*> analyzedLoops;
 
     /// Whether instructions in this function should count as
     /// "coverable" for statistics and search heuristics.
