@@ -128,14 +128,14 @@ class ExecutionState;
 /// dynamic loop invariant deduction.
 class LoopInProcess {
 public:
-  int refCount; // for the ref class.
-private:
+  /// for the ref class. This count also determines how many
+  /// paths are in the loop.
+  int refCount;
+private: public: //TODO a proper encapsulation.
   const llvm::Loop *loop; //Owner: KFunction::loopInfo
-
-  int unfinishedPaths;
-  std::vector<AddressSpace> backEdgeMemories;
-
   AddressSpace headerAddressSpace;
+  bool lastRoundUpdated;
+  std::set<const MemoryObject *> changedObjects;
 
 public:
   LoopInProcess(llvm::Loop *_loop, const ExecutionState &_headerState);

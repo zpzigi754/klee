@@ -1422,6 +1422,79 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
     PHINode *first = static_cast<PHINode*>(state.pc->inst);
     state.incomingBBIndex = first->getBasicBlockIndex(src);
   }
+
+  if (!state.loopInProcess.isNull()) {
+    const llvm::Loop *srcLoop = kf->loopInfo.getLoopFor(src);
+    const llvm::Loop *dstLoop = kf->loopInfo.getLoopFor(dst);
+    const llvm::Loop *inProcessLoop = state.loopInProcess->loop;
+    if (srcLoop && inProcessLoop->contains(srcLoop)) {
+      if (dstLoop && inProcessLoop->contains(dstLoop)) {
+        if (dst == inProcessLoop->getHeader()) {
+          llvm::errs() <<"Ok, we got to the header.\n";
+          bool updated = false;
+          for (MemoryMap::iterator
+                 i = state.loopInProcess->headerAddressSpace.objects.begin(),
+                 e = state.loopInProcess->headerAddressSpace.objects.end();
+               i != e; ++i) {
+            const MemoryObject *obj = i->first;
+            const ObjectState *headOs = i->second;
+            if (state.loopInProcess->changedObjects.find(obj) ==
+                state.loopInProcess->changedObjects.end()) {
+              // back edge object stage
+              const ObjectState *beOs = state.addressSpace.findObject(obj);
+              if (headOs != beOs) {
+                //TODO: exercise some more precise comparison.
+                state.loopInProcess->changedObjects.insert(obj);
+                updated = true;
+              }
+            }
+          }
+          if (updated) {
+            state.loopInProcess->lastRoundUpdated = true;
+            llvm::errs() <<"updated some objects.";
+          }
+
+          llvm::errs() <<"refcount: " <<state.loopInProcess->refCount <<"\n";
+          if (state.loopInProcess->refCount == 1) {
+            //The last state in the round.
+            if (state.loopInProcess->lastRoundUpdated) {
+              llvm::errs() <<"Some more objects were changed."
+                " repeat the loop.\n";
+              state.loopInProcess->lastRoundUpdated = false;
+              //continue. This state will give birth to the next round.
+            } else {
+              llvm::errs() <<"Nothing else changed. Restart loop "
+                " in the normal mode.\n";
+              //TODO .... mark loop as analyzed, so it won't be reanalyzed.
+              //TODO: havoc the changed memory objects. Preserve other.
+              // continue. This state will now run the loop body with the
+              // newly induced invariant applied.
+            }
+          } else {
+            llvm::errs() <<"Terminating loop-repeating state.\n";
+            terminateState(state);
+          }
+        } else {
+          //Do nothing. the state is still in the loop.
+        }
+      } else {
+        state.loopInProcess = 0;
+        llvm::errs() <<"Terminating loop-escaping state.\n";
+        terminateState(state);
+      }
+    } else {
+      if (dstLoop && inProcessLoop->contains(dstLoop)) {
+        assert(dst == inProcessLoop->getHeader() &&
+               "Execution may enter the loop only through the header");
+        state.loopInProcess = 0;
+        llvm::errs() <<"Terminating loop-invading state.\n";
+        terminateState(state);
+      } else {
+        assert(false && "Impossible: a loop in process, but the state"
+               "is not in the loop.");
+      }
+    }
+  }
 }
 
 void Executor::printFileLine(ExecutionState &state, KInstruction *ki,
@@ -1698,10 +1771,15 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       if (statsTracker && state.stack.back().kf->trackCoverage)
         statsTracker->markBranchVisited(branches.first, branches.second);
 
-      if (branches.first)
+      llvm::errs() << "Branching.\n";
+      if (branches.first) {
+        llvm::errs() << "going then\n";
         transferToBasicBlock(bi->getSuccessor(0), bi->getParent(), *branches.first);
-      if (branches.second)
+      }
+      if (branches.second) {
+        llvm::errs() << "going else\n";
         transferToBasicBlock(bi->getSuccessor(1), bi->getParent(), *branches.second);
+      }
     }
     break;
   }
@@ -3828,32 +3906,39 @@ Interpreter *Interpreter::create(const InterpreterOptions &opts,
 void Executor::induceInvariantsForThisLoop(ExecutionState &state,
                                            KInstruction *target)
 {
-  //TODO
-  //... the magick here ...
-
   //TODO: we may use an additional field to keep the previous
   // loopInProcess.
-  assert(!state.loopInProcess.isNull() &&
-         "Do not support nested loops for invariant induction");
 
-  KInstruction *inst = state.prevPC;
-  llvm::Instruction *linst = inst->inst;
-  assert(linst);
-  llvm::errs() <<linst->getOpcodeName() <<"\n";
-  BasicBlock *bb = linst->getParent();
-  assert(bb);
-  llvm::Function *f = bb->getParent();
-  const KFunction::LInfo &loopInfo = kmodule->functionMap[f]->loopInfo;
-  loopInfo.print(llvm::errs());
-  Loop* loop = loopInfo.getLoopFor(bb);
+  if (state.loopInProcess.isNull()) {
+    assert(state.loopInProcess.isNull() &&
+           "Do not support nested loops for invariant induction");
 
-  assert(!loopInfo.empty());
-  assert(loop);
-  assert(loopInfo.isLoopHeader(bb) &&
-         "The klee_induce_invariants must be placed into the condition"
-         " of a loop.");
+    llvm::errs() <<"Start search for loop invariants.\n";
+    KInstruction *inst = state.prevPC;
+    llvm::Instruction *linst = inst->inst;
+    assert(linst);
+    llvm::errs() <<linst->getOpcodeName() <<"\n";
+    BasicBlock *bb = linst->getParent();
+    assert(bb);
+    /*
+      llvm::Function *f = bb->getParent();
+      kmodule->functionMap[f]
+    */
+    KFunction *kf = state.stack.back().kf;
+    const KFunction::LInfo &loopInfo = kf->loopInfo;
+    loopInfo.print(llvm::errs());
+    Loop* loop = loopInfo.getLoopFor(bb);
 
-  state.loopInProcess = new LoopInProcess(loop, state);
+    assert(!loopInfo.empty());
+    assert(loop);
+    assert(loopInfo.isLoopHeader(bb) &&
+           "The klee_induce_invariants must be placed into the condition"
+           " of a loop.");
 
-  bindLocal(target, state, ConstantExpr::create(1, Expr::Int32));
+    state.loopInProcess = new LoopInProcess(loop, state);
+  } else {
+    llvm::errs() <<"allready searching for loop invariants";
+  }
+
+  bindLocal(target, state, ConstantExpr::create(0xffffffff, Expr::Int32));
 }
