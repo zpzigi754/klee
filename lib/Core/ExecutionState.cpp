@@ -70,7 +70,9 @@ ExecutionState::ExecutionState(KFunction *kf) :
     pc(kf->instructions),
     prevPC(pc),
 
-    queryCost(0.), 
+    executionStateForLoopInProcess(0),
+
+    queryCost(0.),
     weight(1),
     depth(0),
 
@@ -82,7 +84,8 @@ ExecutionState::ExecutionState(KFunction *kf) :
 }
 
 ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions)
-    : constraints(assumptions), queryCost(0.), ptreeNode(0) {}
+  : executionStateForLoopInProcess(0), constraints(assumptions),
+    queryCost(0.), ptreeNode(0) {}
 
 ExecutionState::~ExecutionState() {
   for (unsigned int i=0; i<symbolics.size(); i++)
@@ -93,6 +96,7 @@ ExecutionState::~ExecutionState() {
     if (mo->refCount == 0)
       delete mo;
   }
+  delete executionStateForLoopInProcess;
 
   while (!stack.empty()) popFrame();
 }
@@ -106,6 +110,7 @@ ExecutionState::ExecutionState(const ExecutionState& state):
 
     addressSpace(state.addressSpace),
     loopInProcess(state.loopInProcess) ,
+    executionStateForLoopInProcess(0),
     constraints(state.constraints),
 
     queryCost(state.queryCost),
@@ -746,8 +751,45 @@ SymbolSet CallInfo::computeSymbolicVariablesSet() const {
 }
 
 LoopInProcess::LoopInProcess(llvm::Loop *_loop,
-                             const ExecutionState &_headerState)
-  :refCount(0), loop(_loop), headerAddressSpace(_headerState.addressSpace),
+                             ExecutionState *_headerState)
+  :refCount(0), loop(_loop), restartState(_headerState),
    lastRoundUpdated(false)
 {
+  //TODO: this can not belong here. It has nothing to do with execution state,
+  // nor with ptree node.
+  restartState->ptreeNode = 0;
+}
+
+LoopInProcess::~LoopInProcess() {
+  assert(restartState);
+  delete restartState;
+}
+
+ExecutionState *LoopInProcess::makeRestartState() {
+  ExecutionState *newState = restartState->branch();
+  for (std::set<const MemoryObject *>::iterator
+         i = changedObjects.begin(),
+         e = changedObjects.end();
+       i != e; ++i) {
+    const ObjectState *os =
+      newState->addressSpace.findObject(*i);
+    assert(os != 0 &&
+           "changedObjects must contain only existing objects.");
+    assert(!os->readOnly &&
+           "Read only object can not have been changed");
+    ObjectState *wos =
+      newState->addressSpace.getWriteable(*i, os);
+    wos->forgetAll();
+  }
+  if (lastRoundUpdated) {
+    llvm::errs() <<"Some more objects were changed."
+      " repeat the loop.\n";
+    lastRoundUpdated = false;
+    newState->loopInProcess = this;
+  } else {
+    llvm::errs() <<"Nothing else changed. Restart loop "
+      " in the normal mode.\n";
+    newState->loopInProcess = 0;
+  }
+  return newState;
 }

@@ -1400,6 +1400,16 @@ void Executor::executeCall(ExecutionState &state,
   }
 }
 
+void Executor::addState(ExecutionState *current,
+                        ExecutionState *fresh) {
+  current->ptreeNode->data = 0;
+  std::pair<PTree::Node*, PTree::Node*> res =
+    processTree->split(current->ptreeNode, current, fresh);
+  current->ptreeNode = res.first;
+  fresh->ptreeNode = res.second;
+  addedStates.push_back(fresh);
+}
+
 void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src, 
                                     ExecutionState &state) {
   // Note that in general phi nodes can reuse phi values from the same
@@ -1426,12 +1436,14 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
   const llvm::Loop *dstLoop = kf->loopInfo.getLoopFor(dst);
   if (kf->analyzedLoops.find(dstLoop) !=
       kf->analyzedLoops.end()) {
-    llvm::errs() <<"Terminating the state invading into analized loop.\n";
+    assert(kf->loopInfo.isLoopHeader(dst) &&
+           "A loop may be entered only through its head.");
+    //TODO: reexecute the loop for the different start conditions.
+    llvm::errs() <<"Terminating the state invading into an analyzed loop.\n";
     terminateState(state);
   } else {
     if (!state.loopInProcess.isNull()) {
       const llvm::Loop *srcLoop = kf->loopInfo.getLoopFor(src);
-      const llvm::Loop *dstLoop = kf->loopInfo.getLoopFor(dst);
       const llvm::Loop *inProcessLoop = state.loopInProcess->loop;
       if (srcLoop && inProcessLoop->contains(srcLoop)) {
         if (dstLoop && inProcessLoop->contains(dstLoop)) {
@@ -1439,8 +1451,8 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
             llvm::errs() <<"Ok, we got to the header.\n";
             bool updated = false;
             for (MemoryMap::iterator
-                   i = state.loopInProcess->headerAddressSpace.objects.begin(),
-                   e = state.loopInProcess->headerAddressSpace.objects.end();
+                   i = state.loopInProcess->restartState->addressSpace.objects.begin(),
+                   e = state.loopInProcess->restartState->addressSpace.objects.end();
                  i != e; ++i) {
               const MemoryObject *obj = i->first;
               const ObjectState *headOs = i->second;
@@ -1463,28 +1475,38 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
             llvm::errs() <<"refcount: " <<state.loopInProcess->refCount <<"\n";
             if (state.loopInProcess->refCount == 1) {
               //The last state in the round.
-              if (state.loopInProcess->lastRoundUpdated) {
-                llvm::errs() <<"Some more objects were changed."
-                  " repeat the loop.\n";
-                state.loopInProcess->lastRoundUpdated = false;
-                //continue. This state will give birth to the next round.
-              } else {
-                llvm::errs() <<"Nothing else changed. Restart loop "
-                  " in the normal mode.\n";
+              if (!state.loopInProcess->lastRoundUpdated) {
+                llvm::errs() << "Fixpoint reached. Time to"
+                  " restart the iteration in the normal mode.\n";
                 kf->analyzedLoops.insert(inProcessLoop);
-                state.loopInProcess = 0;
-                //TODO: havoc the changed memory objects. Preserve other.
-                // continue. This state will now run the loop body with the
-                // newly induced invariant applied.
               }
+              // Order is important; makeRestartState clears the
+              // lastRoundUpdated flag.
+              ExecutionState *restartState =
+                state.loopInProcess->makeRestartState();
+              llvm::errs()
+                <<"Schedule a fresh copy of the restart state for the loop\n";
+              addState(&state, restartState);
             } else {
-              llvm::errs() <<"Terminating loop-repeating state.\n";
-              terminateState(state);
             }
+            state.loopInProcess = 0;
+            llvm::errs() <<"Terminating the loop-repeating state.\n";
+            terminateState(state);
           } else {
-            //Do nothing. the state is still in the loop.
+            //Do nothing. the state is stil in the loop.
           }
         } else {
+          if (state.loopInProcess->refCount == 1) {
+            if (!state.loopInProcess->lastRoundUpdated) {
+              llvm::errs() << "Fixpoint reached. Time to"
+                " restart the iteration in the normal mode.\n";
+              kf->analyzedLoops.insert(inProcessLoop);
+            }
+            // Order is important; makeRestartState clears the
+            // lastRoundUpdated flag.
+            llvm::errs() <<"Scheduling a restart state for the loop\n";
+            addState(&state, state.loopInProcess->makeRestartState());
+          }
           state.loopInProcess = 0;
           llvm::errs() <<"Terminating loop-escaping state.\n";
           terminateState(state);
@@ -1492,15 +1514,21 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
       } else {
         if (dstLoop && inProcessLoop->contains(dstLoop)) {
           assert(dst == inProcessLoop->getHeader() &&
-                 "Execution may enter the loop only through the header");
+                 "Execution may enter a loop only through the header");
+          assert(state.loopInProcess.isNull() &&
+                 "Nested loop analysis is not supported.");
           state.loopInProcess = 0;
+          //TODO: reexecute the loop for the different start conditions.
           llvm::errs() <<"Terminating loop-invading state.\n";
           terminateState(state);
         } else {
-          assert(false && "Impossible: a loop in process, but the state"
-                 "is not in the loop.");
+          //The execution left the loop being analyzed for a function call.
         }
       }
+    } else if (kf->loopInfo.isLoopHeader(dst)) {
+      /// Remember the initial state for this loop header in
+      /// case ther is an klee_induce_invariants call following.
+      state.executionStateForLoopInProcess = state.branch();
     }
   }
 }
@@ -3915,12 +3943,9 @@ void Executor::induceInvariantsForThisLoop(ExecutionState &state,
                                            KInstruction *target)
 {
   //TODO: we may use an additional field to keep the previous
-  // loopInProcess.
+  // loopInProcess for nested loop-invariant analysis.
 
   if (state.loopInProcess.isNull()) {
-    assert(state.loopInProcess.isNull() &&
-           "Do not support nested loops for invariant induction");
-
     llvm::errs() <<"Start search for loop invariants.\n";
     KInstruction *inst = state.prevPC;
     llvm::Instruction *linst = inst->inst;
@@ -3928,19 +3953,22 @@ void Executor::induceInvariantsForThisLoop(ExecutionState &state,
     llvm::errs() <<linst->getOpcodeName() <<"\n";
     BasicBlock *bb = linst->getParent();
     assert(bb);
-    /*
-      llvm::Function *f = bb->getParent();
-      kmodule->functionMap[f]
-    */
+
     KFunction *kf = state.stack.back().kf;
     const KFunction::LInfo &loopInfo = kf->loopInfo;
-    loopInfo.print(llvm::errs());
+
     Loop* loop = loopInfo.getLoopFor(bb);
+
+    llvm::errs() <<"loop being analyzed:" <<loop <<".\n";
 
     if (kf->analyzedLoops.find(loop) !=
         kf->analyzedLoops.end()) {
-      llvm::errs() <<"The loop is allready analyzed. Execute normally.\n";
+      llvm::errs() <<"The loop is already analyzed. Execute normally.\n";
     } else {
+      assert(state.executionStateForLoopInProcess &&
+             "The initial execution state must have been stored at the entrance"
+             " of the loop header block.");
+
       assert(!loopInfo.empty());
       assert(loop &&
              "The klee_induce_invariants must be placed into the condition"
@@ -3949,10 +3977,13 @@ void Executor::induceInvariantsForThisLoop(ExecutionState &state,
              "The klee_induce_invariants must be placed into the condition"
              " of a loop.");
 
-      state.loopInProcess = new LoopInProcess(loop, state);
+      state.loopInProcess =
+        new LoopInProcess(loop,
+                          state.executionStateForLoopInProcess);
+      state.executionStateForLoopInProcess = 0;
     }
   } else {
-    llvm::errs() <<"allready searching for loop invariants";
+    llvm::errs() <<"Already searching for loop invariants\n";
   }
 
   bindLocal(target, state, ConstantExpr::create(0xffffffff, Expr::Int32));
