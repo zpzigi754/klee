@@ -134,12 +134,19 @@ public:
   int refCount;
 private: public: //TODO a proper encapsulation.
   const llvm::Loop *loop; //Owner: KFunction::loopInfo
-  AddressSpace headerAddressSpace;
+  // No circular dependency here: the restartState must not have
+  // loop in process.
+  ExecutionState *restartState; //Owner.
   bool lastRoundUpdated;
   std::set<const MemoryObject *> changedObjects;
 
 public:
-  LoopInProcess(llvm::Loop *_loop, const ExecutionState &_headerState);
+  // Captures ownership of the _headerState.
+  // TODO: rewrite in terms of std::uniquePtr
+  LoopInProcess(llvm::Loop *_loop, ExecutionState *_headerState);
+  ~LoopInProcess();
+
+  ExecutionState *makeRestartState();
 
 };
 
@@ -177,7 +184,13 @@ public:
   AddressSpace addressSpace;
 
   /// @brief Information necessary for loop invariant induction.
+  /// Owner.
   ref<LoopInProcess> loopInProcess;
+
+  /// @brief This pointer keeps a copy of the state in case
+  ///  we will need to process this loop. Owner.
+  // TODO: replace with std::unique_ptr;
+  ExecutionState *executionStateForLoopInProcess;
 
   /// @brief Constraints collected so far
   ConstraintManager constraints;
