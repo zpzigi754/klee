@@ -604,6 +604,69 @@ void ExecutionState::symbolizeConcretes() {
   }
 }
 
+ExecutionState* ExecutionState::finishLoopRound(std::set<const llvm::Loop *>
+                                                *analyzedLoops) {
+  ExecutionState *nextRoundState = loopInProcess->nextRoundState(analyzedLoops);
+  loopInProcess = 0;
+  return nextRoundState;
+}
+
+void ExecutionState::updateLoopAnalysisForBlockTransfer
+                      (BasicBlock *dst, BasicBlock *src,
+                       bool *terminate, ExecutionState **addState) {
+  KFunction *kf = stack.back().kf;
+  if (!loopInProcess.isNull()) {
+    const llvm::Loop *dstLoop = kf->loopInfo.getLoopFor(dst);
+    const llvm::Loop *srcLoop = kf->loopInfo.getLoopFor(src);
+    const llvm::Loop *inProcessLoop = loopInProcess->loop;
+    if (srcLoop && inProcessLoop->contains(srcLoop)) {
+      if (dstLoop && inProcessLoop->contains(dstLoop)) {
+        if (dst == inProcessLoop->getHeader()) {
+          llvm::errs() <<"Ok, we got to the header.\n";
+          loopInProcess->updateChangedObjects(*this);
+          llvm::errs() <<"refcount: " <<loopInProcess->refCount <<"\n";
+          *addState = finishLoopRound(&kf->analyzedLoops);
+          llvm::errs() <<"Terminating the loop-repeating state.\n";
+          loopInProcess = 0;
+          *terminate = true;
+        } else {
+          //Do nothing. the state is stil in the loop.
+          *terminate = false;
+          *addState = 0;
+        }
+      } else {
+        *addState = finishLoopRound(&kf->analyzedLoops);
+        llvm::errs() <<"Terminating loop-escaping state.\n";
+        loopInProcess = 0;
+        *terminate = true;
+      }
+    } else {
+      if (dstLoop && inProcessLoop->contains(dstLoop)) {
+        assert(dst == inProcessLoop->getHeader() &&
+               "Execution may enter a loop only through the header");
+        assert(loopInProcess.isNull() &&
+               "Nested loop analysis is not supported.");
+        loopInProcess = 0;
+        //FIXME: reexecute the loop for the different start conditions.
+        assert(false && "No support for loop-with-invariant reentry.");
+        llvm::errs() <<"Terminating loop-invading state.\n";
+        *terminate = true;
+        *addState = 0;
+      } else {
+        //The execution left the loop being analyzed for a function call.
+        *terminate = false;
+        *addState = 0;
+      }
+    }
+  } else if (kf->loopInfo.isLoopHeader(dst)) {
+    /// Remember the initial state for this loop header in
+    /// case ther is an klee_induce_invariants call following.
+    executionStateForLoopInProcess = branch();
+    *terminate = false;
+    *addState = 0;
+  }
+}
+
 bool FieldDescr::eq(const FieldDescr& other) const {
   return width == other.width &&
     name == other.name &&
@@ -792,6 +855,7 @@ ExecutionState *LoopInProcess::makeRestartState() {
     llvm::errs() <<"Some more objects were changed."
       " repeat the loop.\n";
     lastRoundUpdated = false;
+    //This works, because refCount is the internal field.
     newState->loopInProcess = this;
   } else {
     llvm::errs() <<"Nothing else changed. Restart loop "
@@ -799,4 +863,42 @@ ExecutionState *LoopInProcess::makeRestartState() {
     newState->loopInProcess = 0;
   }
   return newState;
+}
+
+void LoopInProcess::updateChangedObjects(const ExecutionState& current) {
+  for (MemoryMap::iterator
+         i = restartState->addressSpace.objects.begin(),
+         e = restartState->addressSpace.objects.end();
+       i != e; ++i) {
+    const MemoryObject *obj = i->first;
+    const ObjectState *headOs = i->second;
+    if (changedObjects.find(obj) ==
+        changedObjects.end()) {
+      // back edge object stage
+      const ObjectState *beOs = current.addressSpace.findObject(obj);
+      if (headOs != beOs) {
+        //TODO: exercise some more precise comparison.
+        changedObjects.insert(obj);
+        lastRoundUpdated = true;
+      }
+    }
+  }
+}
+
+ExecutionState* LoopInProcess::nextRoundState(std::set<const llvm::Loop *>
+                                              *analyzedLoops) {
+  if (refCount == 1) {
+    //The last state in the round.
+    if (!lastRoundUpdated) {
+      llvm::errs() << "Fixpoint reached. Time to"
+        " restart the iteration in the normal mode.\n";
+      analyzedLoops->insert(loop);
+    }
+    // Order is important; makeRestartState clears the
+    // lastRoundUpdated flag.
+    llvm::errs()
+      <<"Schedule a fresh copy of the restart state for the loop\n";
+    return makeRestartState();
+  }
+  return 0;
 }

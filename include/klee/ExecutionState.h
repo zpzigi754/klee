@@ -29,6 +29,7 @@
 
 namespace llvm {
   class Function;
+  class BasicBlock;
 }
 
 namespace klee {
@@ -140,14 +141,16 @@ private: public: //TODO a proper encapsulation.
   bool lastRoundUpdated;
   std::set<const MemoryObject *> changedObjects;
 
+  ExecutionState *makeRestartState();
+
 public:
   // Captures ownership of the _headerState.
   // TODO: rewrite in terms of std::uniquePtr
   LoopInProcess(llvm::Loop *_loop, ExecutionState *_headerState);
   ~LoopInProcess();
 
-  ExecutionState *makeRestartState();
-
+  void updateChangedObjects(const ExecutionState& current);
+  ExecutionState* nextRoundState(std::set<const llvm::Loop*> *analyzedLoops);
 };
 
 /// @brief ExecutionState representing a path under exploration
@@ -295,6 +298,11 @@ public:
   void doNotResetThis(const ref<ConstantExpr> &addr,
                       Expr::Width w);
   void symbolizeConcretes();
+  ExecutionState* finishLoopRound(std::set<const llvm::Loop *> *analyzedLoops);
+  void updateLoopAnalysisForBlockTransfer(llvm::BasicBlock *dst,
+                                          llvm::BasicBlock *src,
+                                          bool *terminate,
+                                          ExecutionState **addState);
   std::vector<ref<Expr> > relevantConstraints(SymbolSet symbols) const;
 };
 }
