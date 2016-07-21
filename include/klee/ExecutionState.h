@@ -295,8 +295,6 @@ public:
   void traceRetPtrNestedField(int base_offset, int offset,
                               Expr::Width width, std::string name);
 
-  void doNotResetThis(const ref<ConstantExpr> &addr,
-                      Expr::Width w);
   void symbolizeConcretes();
   ExecutionState* finishLoopRound(std::set<const llvm::Loop *> *analyzedLoops);
   void updateLoopAnalysisForBlockTransfer(llvm::BasicBlock *dst,

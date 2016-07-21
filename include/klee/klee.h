@@ -187,8 +187,7 @@ extern "C" {
   void klee_trace_ret_ptr_nested_field(int base_offset,
                                        int offset, int width, char* name);
 
-  void klee_remember(void* adr, int width);
-  void klee_forget_the_rest();
+  void klee_forget_all();
 
   int klee_induce_invariants();
 
