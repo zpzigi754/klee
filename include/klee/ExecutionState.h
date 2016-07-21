@@ -299,4 +299,14 @@ public:
   std::vector<ref<Expr> > relevantConstraints(SymbolSet symbols) const;
 };
 }
+
+//#define DO_LOG_LOOP_ANALYSIS
+#ifdef DO_LOG_LOOP_ANALYSIS
+#define LOG_LA(expr) \
+  llvm::errs() <<"[LA]" <<__FILE__ <<":" <<__LINE__ \
+  <<": " << expr <<"\n";
+#else//DO_LOG_LOOP_ANALYSIS
+#define LOG_LA(expr)
+#endif//DO_LOG_LOOP_ANALYSIS
+
 #endif

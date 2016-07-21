@@ -615,11 +615,11 @@ void ExecutionState::updateLoopAnalysisForBlockTransfer
     if (srcLoop && inProcessLoop->contains(srcLoop)) {
       if (dstLoop && inProcessLoop->contains(dstLoop)) {
         if (dst == inProcessLoop->getHeader()) {
-          llvm::errs() <<"Ok, we got to the header.\n";
+          LOG_LA("Ok, we got to the header.");
           loopInProcess->updateChangedObjects(*this);
-          llvm::errs() <<"refcount: " <<loopInProcess->refCount <<"\n";
+          LOG_LA("refcount: " <<loopInProcess->refCount);
           *addState = finishLoopRound(&kf->analyzedLoops);
-          llvm::errs() <<"Terminating the loop-repeating state.\n";
+          LOG_LA("Terminating the loop-repeating state.");
           loopInProcess = 0;
           *terminate = true;
         } else {
@@ -629,7 +629,7 @@ void ExecutionState::updateLoopAnalysisForBlockTransfer
         }
       } else {
         *addState = finishLoopRound(&kf->analyzedLoops);
-        llvm::errs() <<"Terminating loop-escaping state.\n";
+        LOG_LA("Terminating loop-escaping state.");
         loopInProcess = 0;
         *terminate = true;
       }
@@ -642,7 +642,7 @@ void ExecutionState::updateLoopAnalysisForBlockTransfer
         loopInProcess = 0;
         //FIXME: reexecute the loop for the different start conditions.
         assert(false && "No support for loop-with-invariant reentry.");
-        llvm::errs() <<"Terminating loop-invading state.\n";
+        LOG_LA("Terminating loop-invading state.");
         *terminate = true;
         *addState = 0;
       } else {
@@ -845,14 +845,14 @@ ExecutionState *LoopInProcess::makeRestartState() {
     wos->forgetAll();
   }
   if (lastRoundUpdated) {
-    llvm::errs() <<"Some more objects were changed."
-      " repeat the loop.\n";
+    LOG_LA("Some more objects were changed."
+           " repeat the loop.");
     lastRoundUpdated = false;
     //This works, because refCount is the internal field.
     newState->loopInProcess = this;
   } else {
-    llvm::errs() <<"Nothing else changed. Restart loop "
-      " in the normal mode.\n";
+    LOG_LA("Nothing else changed. Restart loop "
+           " in the normal mode.");
     newState->loopInProcess = 0;
   }
   return newState;
@@ -883,14 +883,13 @@ ExecutionState* LoopInProcess::nextRoundState(std::set<const llvm::Loop *>
   if (refCount == 1) {
     //The last state in the round.
     if (!lastRoundUpdated) {
-      llvm::errs() << "Fixpoint reached. Time to"
-        " restart the iteration in the normal mode.\n";
+      LOG_LA("Fixpoint reached. Time to"
+             " restart the iteration in the normal mode.");
       analyzedLoops->insert(loop);
     }
     // Order is important; makeRestartState clears the
     // lastRoundUpdated flag.
-    llvm::errs()
-      <<"Schedule a fresh copy of the restart state for the loop\n";
+    LOG_LA("Schedule a fresh copy of the restart state for the loop");
     return makeRestartState();
   }
   return 0;
