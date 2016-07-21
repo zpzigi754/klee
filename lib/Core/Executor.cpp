@@ -1386,7 +1386,7 @@ void Executor::handleLoopAnalysis(BasicBlock *dst, BasicBlock *src,
     assert(kf->loopInfo.isLoopHeader(dst) &&
            "A loop may be entered only through its head.");
     //TODO: reeveluate the loop for the generalized start conditions.
-    llvm::errs() <<"Terminating the state invading into an analyzed loop.\n";
+    LOG_LA("Terminating the state invading into an analyzed loop.");
     terminateState(state);
   } else {
     bool terminate = false;
@@ -1395,7 +1395,7 @@ void Executor::handleLoopAnalysis(BasicBlock *dst, BasicBlock *src,
                                              &terminate, &scheduleState);
     if (scheduleState) addState(&state, scheduleState);
     if (terminate) {
-      llvm::errs() <<"Terminating state after loop analysis update.\n";
+      LOG_LA("Terminating state after loop analysis update.");
       terminateState(state);
     }
   }
@@ -1666,13 +1666,13 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       if (statsTracker && state.stack.back().kf->trackCoverage)
         statsTracker->markBranchVisited(branches.first, branches.second);
 
-      llvm::errs() << "Branching.\n";
+      LOG_LA( "Branching.");
       if (branches.first) {
-        llvm::errs() << "going then\n";
+        LOG_LA( "going then");
         transferToBasicBlock(bi->getSuccessor(0), bi->getParent(), *branches.first);
       }
       if (branches.second) {
-        llvm::errs() << "going else\n";
+        LOG_LA( "going else");
         transferToBasicBlock(bi->getSuccessor(1), bi->getParent(), *branches.second);
       }
     }
@@ -4026,11 +4026,11 @@ void Executor::induceInvariantsForThisLoop(ExecutionState &state,
   // loopInProcess for nested loop-invariant analysis.
 
   if (state.loopInProcess.isNull()) {
-    llvm::errs() <<"Start search for loop invariants.\n";
+    LOG_LA("Start search for loop invariants.");
     KInstruction *inst = state.prevPC;
     llvm::Instruction *linst = inst->inst;
     assert(linst);
-    llvm::errs() <<linst->getOpcodeName() <<"\n";
+    LOG_LA(linst->getOpcodeName());
     BasicBlock *bb = linst->getParent();
     assert(bb);
 
@@ -4039,11 +4039,11 @@ void Executor::induceInvariantsForThisLoop(ExecutionState &state,
 
     Loop* loop = loopInfo.getLoopFor(bb);
 
-    llvm::errs() <<"loop being analyzed:" <<loop <<".\n";
+    LOG_LA("loop being analyzed:" <<loop);
 
     if (kf->analyzedLoops.find(loop) !=
         kf->analyzedLoops.end()) {
-      llvm::errs() <<"The loop is already analyzed. Execute normally.\n";
+      LOG_LA("The loop is already analyzed. Execute normally.");
     } else {
       assert(state.executionStateForLoopInProcess &&
              "The initial execution state must have been stored at the entrance"
@@ -4063,7 +4063,7 @@ void Executor::induceInvariantsForThisLoop(ExecutionState &state,
       state.executionStateForLoopInProcess = 0;
     }
   } else {
-    llvm::errs() <<"Already searching for loop invariants\n";
+    LOG_LA("Already searching for loop invariants");
   }
 
   bindLocal(target, state, ConstantExpr::create(0xffffffff, Expr::Int32));
