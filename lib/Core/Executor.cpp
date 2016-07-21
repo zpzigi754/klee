@@ -1383,11 +1383,14 @@ void Executor::handleLoopAnalysis(BasicBlock *dst, BasicBlock *src,
   const llvm::Loop *dstLoop = kf->loopInfo.getLoopFor(dst);
   if (kf->analyzedLoops.find(dstLoop) !=
       kf->analyzedLoops.end()) {
-    assert(kf->loopInfo.isLoopHeader(dst) &&
-           "A loop may be entered only through its head.");
-    //TODO: reeveluate the loop for the generalized start conditions.
-    LOG_LA("Terminating the state invading into an analyzed loop.");
-    terminateState(state);
+    if (kf->loopInfo.isLoopHeader(dst)) {
+      //TODO: reevaluate the loop for the generalized start conditions.
+      LOG_LA("Terminating the state invading into an analyzed loop.");
+      terminateState(state);
+    } else {
+      //Continue, the path currently exploring the loop right after it was
+      // analyzed and all the nonstable variables havoced.
+    }
   } else {
     bool terminate = false;
     ExecutionState *scheduleState = 0;
