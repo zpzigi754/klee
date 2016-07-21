@@ -1410,6 +1410,30 @@ void Executor::addState(ExecutionState *current,
   addedStates.push_back(fresh);
 }
 
+void Executor::handleLoopAnalysis(BasicBlock *dst, BasicBlock *src,
+                                  ExecutionState &state) {
+  const KFunction *kf = state.stack.back().kf;
+  const llvm::Loop *dstLoop = kf->loopInfo.getLoopFor(dst);
+  if (kf->analyzedLoops.find(dstLoop) !=
+      kf->analyzedLoops.end()) {
+    assert(kf->loopInfo.isLoopHeader(dst) &&
+           "A loop may be entered only through its head.");
+    //TODO: reeveluate the loop for the generalized start conditions.
+    llvm::errs() <<"Terminating the state invading into an analyzed loop.\n";
+    terminateState(state);
+  } else {
+    bool terminate = false;
+    ExecutionState *scheduleState = 0;
+    state.updateLoopAnalysisForBlockTransfer(dst, src,
+                                             &terminate, &scheduleState);
+    if (scheduleState) addState(&state, scheduleState);
+    if (terminate) {
+      llvm::errs() <<"Terminating state after loop analysis update.\n";
+      terminateState(state);
+    }
+  }
+}
+
 void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src, 
                                     ExecutionState &state) {
   // Note that in general phi nodes can reuse phi values from the same
@@ -1433,25 +1457,7 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
     state.incomingBBIndex = first->getBasicBlockIndex(src);
   }
 
-  const llvm::Loop *dstLoop = kf->loopInfo.getLoopFor(dst);
-  if (kf->analyzedLoops.find(dstLoop) !=
-      kf->analyzedLoops.end()) {
-    assert(kf->loopInfo.isLoopHeader(dst) &&
-           "A loop may be entered only through its head.");
-    //TODO: reexecute the loop for the different start conditions.
-    llvm::errs() <<"Terminating the state invading into an analyzed loop.\n";
-    terminateState(state);
-  } else {
-    bool terminate = false;
-    ExecutionState *scheduleState = 0;
-    state.updateLoopAnalysisForBlockTransfer(dst, src,
-                                             &terminate, &scheduleState);
-    if (scheduleState) addState(&state, scheduleState);
-    if (terminate) {
-      llvm::errs() <<"Terminating state after loop analysis update.\n";
-      terminateState(state);
-    }
-  }
+  handleLoopAnalysis(dst, src, state);
 }
 
 void Executor::printFileLine(ExecutionState &state, KInstruction *ki,
