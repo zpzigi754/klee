@@ -160,8 +160,6 @@ private:
   // XXX cleanup name of flushMask (its backwards or something)
   BitArray *concreteMask;
 
-  BitArray *unforgettableMask;
-
   // mutable because may need flushed during read of const
   mutable BitArray *flushMask;
 
@@ -209,9 +207,6 @@ public:
   void write16(unsigned offset, uint16_t value);
   void write32(unsigned offset, uint32_t value);
   void write64(unsigned offset, uint64_t value);
-
-  void setUnforgettable(unsigned offset, Expr::Width width);
-  void resetUnforgettable();
 
   void forgetAll();
 

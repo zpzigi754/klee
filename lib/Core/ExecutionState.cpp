@@ -567,23 +567,6 @@ void ExecutionState::traceRetPtrNestedField(int base_offset,
   ret->fields[base_offset].fields[offset] = descr;
 }
 
-void ExecutionState::doNotResetThis(const ref<ConstantExpr> &addr,
-                                    Expr::Width w) {
-  ObjectPair op;
-  if (!addressSpace.resolveOne(addr, op)) {
-    llvm::errs() << "Can not remember this address:" <<
-      addr->getZExtValue() <<": NOT FOUND\n";
-    return;
-  }
-  const MemoryObject *mo = op.first;
-  ref<Expr> offset = mo->getOffsetExpr(addr);
-  assert(isa<klee::ConstantExpr>(offset));
-  uint64_t offset_val = (cast<klee::ConstantExpr>(offset))->getZExtValue();
-  //TODO check bounds.
-  const ObjectState *os = op.second;
-  addressSpace.getWriteable(mo, os)->setUnforgettable(offset_val, w);
-}
-
 void ExecutionState::symbolizeConcretes() {
   for (MemoryMap::iterator obj_I = addressSpace.objects.begin(),
          obj_E = addressSpace.objects.end(); obj_I != obj_E; ++obj_I) {
@@ -592,7 +575,6 @@ void ExecutionState::symbolizeConcretes() {
     if (!os->readOnly) {
       ObjectState *osw = addressSpace.getWriteable(mo, os);
       osw->forgetAll();
-      osw->resetUnforgettable();
     }
   }
 }

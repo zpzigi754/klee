@@ -123,8 +123,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_trace_ret_ptr_field", handleTraceRetPtrField, false),
   add("klee_trace_param_ptr_nested_field", handleTraceParamPtrNestedField, false),
   add("klee_trace_ret_ptr_nested_field", handleTraceRetPtrNestedField, false),
-  add("klee_remember", handleRemember, false),
-  add("klee_forget_the_rest", handleForgetTheRest, false),
+  add("klee_forget_all", handleForgetAll, false),
   add("klee_induce_invariants", handleInduceInvariants, true),
 
   // operator delete[](void*)
@@ -875,20 +874,7 @@ void SpecialFunctionHandler::handleTraceParamFPtr(ExecutionState &state,
   state.traceArgFunPtr(arguments[0], name);
 }
 
-void SpecialFunctionHandler::handleRemember(ExecutionState &state,
-                                            KInstruction *target,
-                                            std::vector<ref<Expr> > &arguments) {
-  assert(isa<klee::ConstantExpr>(arguments[0]) &&
-         "The pointer to the value to be remembered must be a static constant.");
-  assert(isa<klee::ConstantExpr>(arguments[1]) &&
-         "The width of the value to be remembered must be a static constant.");
-  ref<klee::ConstantExpr> ptr = cast<klee::ConstantExpr>(arguments[0]);
-  Expr::Width width = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
-  width = width * 8;//Convert to bits.
-  state.doNotResetThis(ptr, width);
-}
-
-void SpecialFunctionHandler::handleForgetTheRest
+void SpecialFunctionHandler::handleForgetAll
 (ExecutionState &state, KInstruction *target, std::vector<ref<Expr> > &arguments) {
   state.constraints.clear();
   state.symbolizeConcretes();

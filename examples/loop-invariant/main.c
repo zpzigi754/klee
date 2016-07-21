@@ -11,7 +11,7 @@ int main() {
   int z = 10;
   klee_assume(y==5);
   if (3 < x) {
-    klee_forget_the_rest();
+    klee_forget_all();
     if (3 < x) {
       printf("bigger\n");
     } else {
