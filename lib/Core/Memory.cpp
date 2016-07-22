@@ -300,10 +300,9 @@ void ObjectState::forgetThese(const BitArray *bytesToForget) {
       markByteSymbolic(i);
       ref<Expr> read = ReadExpr::create(ul, ConstantExpr::alloc(i, Expr::Int32));
       setKnownSymbolic(i, read.get());
+      markByteUnflushed(i);
     }
   }
-  if (flushMask) delete flushMask;
-  flushMask = 0;
   // llvm::errs() << "\n";
 }
 void ObjectState::initializeToZero() {
