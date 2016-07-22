@@ -806,25 +806,38 @@ LoopInProcess::LoopInProcess(llvm::Loop *_loop,
 }
 
 LoopInProcess::~LoopInProcess() {
+  for (std::map<const MemoryObject *, BitArray *>::iterator
+         i = changedBytes.begin(),
+         e = changedBytes.end();
+       i != e; ++i) {
+    delete i->second;
+  }
   assert(restartState);
   delete restartState;
 }
 
 ExecutionState *LoopInProcess::makeRestartState() {
   ExecutionState *newState = restartState->branch();
-  for (std::set<const MemoryObject *>::iterator
-         i = changedObjects.begin(),
-         e = changedObjects.end();
+  for (std::map<const MemoryObject *, BitArray *>::iterator
+         i = changedBytes.begin(),
+         e = changedBytes.end();
        i != e; ++i) {
+    const MemoryObject *mo = i->first;
+    const BitArray *bytes = i->second;
+    if (mo->allocSite) {
+      llvm::errs() <<" Forgetting: [" <<mo->size <<"]" <<*mo->allocSite <<"\n";
+    } else {
+      llvm::errs() <<" Forgetting something.\n";
+    }
     const ObjectState *os =
-      newState->addressSpace.findObject(*i);
+      newState->addressSpace.findObject(mo);
     assert(os != 0 &&
            "changedObjects must contain only existing objects.");
     assert(!os->readOnly &&
            "Read only object can not have been changed");
     ObjectState *wos =
-      newState->addressSpace.getWriteable(*i, os);
-    wos->forgetAll();
+      newState->addressSpace.getWriteable(mo, os);
+    wos->forgetThese(bytes);
   }
   if (lastRoundUpdated) {
     LOG_LA("Some more objects were changed."
@@ -847,13 +860,22 @@ void LoopInProcess::updateChangedObjects(const ExecutionState& current) {
        i != e; ++i) {
     const MemoryObject *obj = i->first;
     const ObjectState *headOs = i->second;
-    if (changedObjects.find(obj) ==
-        changedObjects.end()) {
-      // back edge object stage
-      const ObjectState *beOs = current.addressSpace.findObject(obj);
-      if (headOs != beOs) {
-        //TODO: exercise some more precise comparison.
-        changedObjects.insert(obj);
+    const ObjectState *beOs = current.addressSpace.findObject(obj);
+    if (headOs == beOs) continue;
+    std::pair<std::map<const MemoryObject *, BitArray *>::iterator,
+              bool> insRez = changedBytes.insert
+      (std::pair<const MemoryObject *, BitArray *>(obj, 0));
+    if (insRez.second) insRez.first->second =
+                         new BitArray(obj->size);
+    BitArray *bytes = insRez.first->second;
+    assert(bytes != 0);
+    unsigned size = obj->size;
+    for (unsigned j = 0; j < size; ++j) {
+      if (bytes->get(j)) continue;
+      ref<Expr> headVal = headOs->read8(j);
+      ref<Expr> beVal = beOs->read8(j);
+      if (0 != headVal->compare(*beVal)) {
+        bytes->set(j);
         lastRoundUpdated = true;
       }
     }

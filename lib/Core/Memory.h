@@ -208,6 +208,7 @@ public:
   void write32(unsigned offset, uint32_t value);
   void write64(unsigned offset, uint64_t value);
 
+  void forgetThese(const BitArray *bytesToForget);
   void forgetAll();
 
 private:
