@@ -15,6 +15,7 @@
 #include "klee/Internal/ADT/TreeStream.h"
 #include "klee/MergeHandler.h"
 #include "klee/util/GetExprSymbols.h"
+#include "klee/util/BitArray.h"
 
 // FIXME: We do not want to be exposing these? :(
 #include "../../lib/Core/AddressSpace.h"
@@ -139,7 +140,9 @@ private: public: //TODO a proper encapsulation.
   // loop in process.
   ExecutionState *restartState; //Owner.
   bool lastRoundUpdated;
-  std::set<const MemoryObject *> changedObjects;
+  //Owner for the bitarrays.
+  std::map<const MemoryObject *, BitArray *> changedBytes;
+  //std::set<const MemoryObject *> changedObjects;
 
   ExecutionState *makeRestartState();
 

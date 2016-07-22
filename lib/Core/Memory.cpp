@@ -270,33 +270,52 @@ void ObjectState::forgetAll() {
   static unsigned id = 0;
   //assert(size != 0); //TODO: why size can ever be 0?
   if (size == 0) return;
-  llvm::errs() << " forgetting ["
-               << object->isGlobal
-               << object->isLocal
-               << object->isFixed
-               << object->fake_object
-               << object->isUserSpecified << "]:";
+  // llvm::errs() << " forgetting ["
+  //              << object->isGlobal
+  //              << object->isLocal
+  //              << object->isFixed
+  //              << object->fake_object
+  //              << object->isUserSpecified << "]:";
   const Array *array =
     getArrayCache()->CreateArray("reset_arr" + llvm::utostr(++id),
                                  size);
   UpdateList ul(array, 0);
   for (unsigned i=0; i<size; i++) {
     ref<Expr> tmp = read8(i);
-    if (isa<ConstantExpr>(tmp)) {
-      llvm::errs() << tmp <<"("
-                   <<(char)(dyn_cast<ConstantExpr>(tmp))->getZExtValue()
-                   <<"), ";
-    } else
-      llvm::errs() << tmp <<", ";
+    // if (isa<ConstantExpr>(tmp)) {
+    //   llvm::errs() << tmp <<"("
+    //                <<(char)(dyn_cast<ConstantExpr>(tmp))->getZExtValue()
+    //                <<"), ";
+    // } else
+    //   llvm::errs() << tmp <<", ";
     markByteSymbolic(i);
     ref<Expr> read = ReadExpr::create(ul, ConstantExpr::alloc(i, Expr::Int32));
     setKnownSymbolic(i, read.get());
   }
   if (flushMask) delete flushMask;
   flushMask = 0;
-  llvm::errs() << "\n";
+  // llvm::errs() << "\n";
 }
 
+void ObjectState::forgetThese(const BitArray *bytesToForget) {
+  static unsigned id = 0;
+  //assert(size != 0); //TODO: why size can ever be 0?
+  if (size == 0) return;
+  const Array *array =
+    getArrayCache()->CreateArray("reset_arr" + llvm::utostr(++id),
+                                 size);
+  UpdateList ul(array, 0);
+  for (unsigned i=0; i<size; i++) {
+    if (bytesToForget->get(i)) {
+      markByteSymbolic(i);
+      ref<Expr> read = ReadExpr::create(ul, ConstantExpr::alloc(i, Expr::Int32));
+      setKnownSymbolic(i, read.get());
+    }
+  }
+  if (flushMask) delete flushMask;
+  flushMask = 0;
+  // llvm::errs() << "\n";
+}
 void ObjectState::initializeToZero() {
   makeConcrete();
   memset(concreteStore, 0, size);

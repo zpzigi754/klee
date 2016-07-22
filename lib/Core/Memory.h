@@ -215,6 +215,7 @@ public:
   void flushToConcreteStore(TimingSolver *solver,
                             const ExecutionState &state) const;
 
+  void forgetThese(const BitArray *bytesToForget);
   void forgetAll();
 
 private:
