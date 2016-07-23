@@ -13,6 +13,7 @@
 #include "klee/Internal/Module/InstructionInfoTable.h"
 #include "klee/Internal/Module/KInstruction.h"
 #include "klee/Internal/Module/KModule.h"
+#include "TimingSolver.h"
 
 #include "klee/Expr.h"
 
@@ -588,6 +589,7 @@ ExecutionState* ExecutionState::finishLoopRound(std::set<const llvm::Loop *>
 
 void ExecutionState::updateLoopAnalysisForBlockTransfer
                       (BasicBlock *dst, BasicBlock *src,
+                       TimingSolver* solver,
                        bool *terminate, ExecutionState **addState) {
   KFunction *kf = stack.back().kf;
   if (!loopInProcess.isNull()) {
@@ -598,7 +600,7 @@ void ExecutionState::updateLoopAnalysisForBlockTransfer
       if (dstLoop && inProcessLoop->contains(dstLoop)) {
         if (dst == inProcessLoop->getHeader()) {
           LOG_LA("Ok, we got to the header.");
-          loopInProcess->updateChangedObjects(*this);
+          loopInProcess->updateChangedObjects(*this, solver);
           LOG_LA("refcount: " <<loopInProcess->refCount);
           *addState = finishLoopRound(&kf->analyzedLoops);
           LOG_LA("Terminating the loop-repeating state.");
@@ -816,6 +818,14 @@ LoopInProcess::~LoopInProcess() {
   delete restartState;
 }
 
+unsigned countBitsSet(const BitArray *arr, unsigned size) {
+  unsigned rez = 0;
+  for (unsigned i = 0; i < size; ++i) {
+    if (arr->get(i)) ++rez;
+  }
+  return rez;
+}
+
 ExecutionState *LoopInProcess::makeRestartState() {
   ExecutionState *newState = restartState->branch();
   for (std::map<const MemoryObject *, BitArray *>::iterator
@@ -825,7 +835,8 @@ ExecutionState *LoopInProcess::makeRestartState() {
     const MemoryObject *mo = i->first;
     const BitArray *bytes = i->second;
     if (mo->allocSite) {
-      llvm::errs() <<" Forgetting: [" <<mo->size <<"]" <<*mo->allocSite <<"\n";
+      llvm::errs() <<" Forgetting: [" <<countBitsSet(bytes, mo->size)
+                   <<"/" <<mo->size <<"]" <<*mo->allocSite <<"\n";
     } else {
       llvm::errs() <<" Forgetting something.\n";
     }
@@ -853,7 +864,8 @@ ExecutionState *LoopInProcess::makeRestartState() {
   return newState;
 }
 
-void LoopInProcess::updateChangedObjects(const ExecutionState& current) {
+void LoopInProcess::updateChangedObjects(const ExecutionState& current,
+                                         TimingSolver* solver) {
   for (MemoryMap::iterator
          i = restartState->addressSpace.objects.begin(),
          e = restartState->addressSpace.objects.end();
@@ -875,8 +887,21 @@ void LoopInProcess::updateChangedObjects(const ExecutionState& current) {
       ref<Expr> headVal = headOs->read8(j);
       ref<Expr> beVal = beOs->read8(j);
       if (0 != headVal->compare(*beVal)) {
-        bytes->set(j);
-        lastRoundUpdated = true;
+        //So: this byte was not diferent on the previous round,
+        // it also differs structurally now. It is time to make
+        // sure it can be really different.
+
+        solver->setTimeout(10);//TODO: determine a correct argument here.
+        bool mayDiffer = true;
+        bool solverRes = solver->mayBeFalse(current, EqExpr::create(headVal, beVal),
+                                            /*&*/mayDiffer);
+        solver->setTimeout(0);
+        //assert(solverRes &&
+        //       "Solver failed in computing whther a byte changed or not.");
+        if (solverRes && mayDiffer) {
+          bytes->set(j);
+          lastRoundUpdated = true;
+        }
       }
     }
   }

@@ -1428,6 +1428,7 @@ void Executor::handleLoopAnalysis(BasicBlock *dst, BasicBlock *src,
     bool terminate = false;
     ExecutionState *scheduleState = 0;
     state.updateLoopAnalysisForBlockTransfer(dst, src,
+                                             solver,
                                              &terminate, &scheduleState);
     if (scheduleState) addState(&state, scheduleState);
     if (terminate) {

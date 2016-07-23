@@ -41,6 +41,7 @@ struct KInstruction;
 class MemoryObject;
 class PTreeNode;
 struct InstructionInfo;
+class TimingSolver;
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const MemoryMap &mm);
 
@@ -151,7 +152,7 @@ public:
   LoopInProcess(llvm::Loop *_loop, ExecutionState *_headerState);
   ~LoopInProcess();
 
-  void updateChangedObjects(const ExecutionState& current);
+  void updateChangedObjects(const ExecutionState& current, TimingSolver* solver);
   ExecutionState* nextRoundState(std::set<const llvm::Loop*> *analyzedLoops);
 };
 
@@ -295,6 +296,7 @@ public:
   ExecutionState* finishLoopRound(std::set<const llvm::Loop *> *analyzedLoops);
   void updateLoopAnalysisForBlockTransfer(llvm::BasicBlock *dst,
                                           llvm::BasicBlock *src,
+                                          TimingSolver* solver,
                                           bool *terminate,
                                           ExecutionState **addState);
   std::vector<ref<Expr> > relevantConstraints(SymbolSet symbols) const;
