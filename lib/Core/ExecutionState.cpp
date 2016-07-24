@@ -81,14 +81,14 @@ ExecutionState::ExecutionState(KFunction *kf) :
     coveredNew(false),
     forkDisabled(false),
     ptreeNode(0),
-    erroneous(false) {
+    doTrace(true) {
   pushFrame(0, kf);
 }
 
 ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions)
   : executionStateForLoopInProcess(0), constraints(assumptions),
     queryCost(0.), ptreeNode(0),
-    erroneous(false) {}
+    doTrace(true) {}
 
 ExecutionState::~ExecutionState() {
   for (unsigned int i=0; i<symbolics.size(); i++)
@@ -131,7 +131,7 @@ ExecutionState::ExecutionState(const ExecutionState& state):
     symbolics(state.symbolics),
     arrayNames(state.arrayNames),
     callPath(state.callPath),
-    erroneous(state.erroneous)
+    doTrace(state.doTrace)
 {
   for (unsigned int i=0; i<symbolics.size(); i++)
     symbolics[i].first->refCount++;

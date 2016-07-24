@@ -1419,6 +1419,7 @@ void Executor::handleLoopAnalysis(BasicBlock *dst, BasicBlock *src,
     if (kf->loopInfo.isLoopHeader(dst)) {
       //TODO: reevaluate the loop for the generalized start conditions.
       LOG_LA("Terminating the state invading into an analyzed loop.");
+      state.doTrace = false;
       terminateState(state);
     } else {
       //Continue, the path currently exploring the loop right after it was
@@ -1433,6 +1434,7 @@ void Executor::handleLoopAnalysis(BasicBlock *dst, BasicBlock *src,
     if (scheduleState) addState(&state, scheduleState);
     if (terminate) {
       LOG_LA("Terminating state after loop analysis update.");
+      state.doTrace = false;
       terminateState(state);
     }
   }
@@ -2965,7 +2967,7 @@ void Executor::terminateState(ExecutionState &state) {
   }
 
   if (state.loopInProcess.isNull() &&
-      !state.erroneous) {
+      state.doTrace) {
     interpreterHandler->processCallPath(state);
     interpreterHandler->incPathsExplored();
   }
@@ -3082,7 +3084,7 @@ void Executor::terminateStateOnError(ExecutionState &state,
 
     interpreterHandler->processTestCase(state, msg.str().c_str(), suffix);
   }
-  state.erroneous = true;
+  state.doTrace = false;
 
   terminateState(state);
 }
