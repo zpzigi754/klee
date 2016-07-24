@@ -1386,7 +1386,23 @@ void Executor::handleLoopAnalysis(BasicBlock *dst, BasicBlock *src,
     if (kf->loopInfo.isLoopHeader(dst)) {
       //TODO: reevaluate the loop for the generalized start conditions.
       LOG_LA("Terminating the state invading into an analyzed loop.");
-      state.doTrace = false;
+      /*
+        Commented out, because we do need to trace even the ivading states.
+        Better if we actually continue them with proper loop-invariant
+        generalization/alteratoin and reanalyzis.
+
+        Also, we must trace the backedge states as well as the others.
+
+      const llvm::Loop *srcLoop = kf->loopInfo.getLoopFor(src);
+      if (!dstLoop->contains(srcLoop)) {
+        // This is a backedge of the analyzed loop.
+        // Normally I should check an invariant logical expression here,
+        // bot for now it is left for the developer own conscience.
+      } else {
+        // 
+        state.doTrace = false;
+      }
+      */
       terminateState(state);
     } else {
       //Continue, the path currently exploring the loop right after it was
@@ -1398,7 +1414,9 @@ void Executor::handleLoopAnalysis(BasicBlock *dst, BasicBlock *src,
     state.updateLoopAnalysisForBlockTransfer(dst, src,
                                              solver,
                                              &terminate, &scheduleState);
-    if (scheduleState) addState(&state, scheduleState);
+    if (scheduleState) {
+      addState(&state, scheduleState);
+    }
     if (terminate) {
       LOG_LA("Terminating state after loop analysis update.");
       state.doTrace = false;
