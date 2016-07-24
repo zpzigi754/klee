@@ -248,9 +248,9 @@ public:
 
   std::vector<CallInfo> callPath;
 
-  /// @brief: a flag indicating that the state has reached an
-  /// error in the code.
-  bool erroneous;
+  /// @brief: a flag indicating that the state is genuine and not
+  ///  a product of some ancillary analysis, like loop-invariant search.
+  bool doTrace;
 
 
   std::string getFnAlias(std::string fn);
