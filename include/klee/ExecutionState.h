@@ -248,6 +248,11 @@ public:
 
   std::vector<CallInfo> callPath;
 
+  /// @brief: a flag indicating that the state has reached an
+  /// error in the code.
+  bool erroneous;
+
+
   std::string getFnAlias(std::string fn);
   void addFnAlias(std::string old_fn, std::string new_fn);
   void removeFnAlias(std::string fn);
