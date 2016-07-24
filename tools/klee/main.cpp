@@ -581,6 +581,7 @@ void KleeHandler::processTestCase(const ExecutionState &state,
 
 bool dumpCallInfo(const CallInfo& ci, llvm::raw_ostream& file) {
   file << ci.f->getName() <<"(";
+  assert(ci.returned);
   for (std::vector< CallArg >::const_iterator argIter = ci.args.begin(),
          end = ci.args.end(); argIter != end; ++argIter) {
     const CallArg *arg = &*argIter;
@@ -687,6 +688,7 @@ bool dumpCallArgSExpr(const CallArg *arg, llvm::raw_ostream& file) {
 
 bool dumpCallInfoSExpr(const CallInfo& ci, llvm::raw_ostream& file) {
   file <<"((fun_name \"" <<ci.f->getName() <<"\")\n (args (\n";
+  assert(ci.returned);
   for (std::vector< CallArg >::const_iterator argIter = ci.args.begin(),
          end = ci.args.end(); argIter != end; ++argIter) {
     const CallArg *arg = &*argIter;

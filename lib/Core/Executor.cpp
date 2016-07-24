@@ -2964,8 +2964,11 @@ void Executor::terminateState(ExecutionState &state) {
                       "replay did not consume all objects in test input.");
   }
 
-  interpreterHandler->processCallPath(state);
-  interpreterHandler->incPathsExplored();
+  if (state.loopInProcess.isNull() &&
+      !state.erroneous) {
+    interpreterHandler->processCallPath(state);
+    interpreterHandler->incPathsExplored();
+  }
 
   std::vector<ExecutionState *>::iterator it =
       std::find(addedStates.begin(), addedStates.end(), &state);
@@ -3079,7 +3082,8 @@ void Executor::terminateStateOnError(ExecutionState &state,
 
     interpreterHandler->processTestCase(state, msg.str().c_str(), suffix);
   }
-    
+  state.erroneous = true;
+
   terminateState(state);
 }
 

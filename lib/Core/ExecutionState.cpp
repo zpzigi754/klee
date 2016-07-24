@@ -80,13 +80,15 @@ ExecutionState::ExecutionState(KFunction *kf) :
     instsSinceCovNew(0),
     coveredNew(false),
     forkDisabled(false),
-    ptreeNode(0) {
+    ptreeNode(0),
+    erroneous(false) {
   pushFrame(0, kf);
 }
 
 ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions)
   : executionStateForLoopInProcess(0), constraints(assumptions),
-    queryCost(0.), ptreeNode(0) {}
+    queryCost(0.), ptreeNode(0),
+    erroneous(false) {}
 
 ExecutionState::~ExecutionState() {
   for (unsigned int i=0; i<symbolics.size(); i++)
@@ -128,7 +130,8 @@ ExecutionState::ExecutionState(const ExecutionState& state):
     ptreeNode(state.ptreeNode),
     symbolics(state.symbolics),
     arrayNames(state.arrayNames),
-    callPath(state.callPath)
+    callPath(state.callPath),
+    erroneous(state.erroneous)
 {
   for (unsigned int i=0; i<symbolics.size(); i++)
     symbolics[i].first->refCount++;
@@ -891,7 +894,7 @@ void LoopInProcess::updateChangedObjects(const ExecutionState& current,
         // it also differs structurally now. It is time to make
         // sure it can be really different.
 
-        solver->setTimeout(10);//TODO: determine a correct argument here.
+        solver->setTimeout(0.01);//TODO: determine a correct argument here.
         bool mayDiffer = true;
         bool solverRes = solver->mayBeFalse(current, EqExpr::create(headVal, beVal),
                                             /*&*/mayDiffer);
