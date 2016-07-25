@@ -13,6 +13,7 @@
 #include "klee/Constraints.h"
 #include "klee/Expr.h"
 #include "klee/Internal/ADT/TreeStream.h"
+#include "klee/Internal/ADT/ImmutableSet.h"
 #include "klee/util/GetExprSymbols.h"
 #include "klee/LoopAnalysis.h"
 
@@ -196,6 +197,11 @@ public:
   /// @brief Information necessary for loop invariant induction.
   /// Owner.
   ref<LoopInProcess> loopInProcess;
+
+  /// @brief A message from the final round of loop analysis to the
+  /// klee_induce_invariants handler, to allow analysed loops
+  /// skip it with no effect.
+  ImmutableSet<const llvm::Loop*> analysedLoops;
 
   /// @brief This pointer keeps a copy of the state in case
   ///  we will need to process this loop. Owner.

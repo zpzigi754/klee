@@ -87,7 +87,8 @@ ExecutionState::ExecutionState(KFunction *kf) :
 }
 
 ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions)
-  : executionStateForLoopInProcess(0), constraints(assumptions),
+  : executionStateForLoopInProcess(0),
+    constraints(assumptions),
     queryCost(0.), ptreeNode(0),
     doTrace(true) {}
 
@@ -114,6 +115,7 @@ ExecutionState::ExecutionState(const ExecutionState& state):
 
     addressSpace(state.addressSpace),
     loopInProcess(state.loopInProcess) ,
+    analysedLoops(state.analysedLoops),
     executionStateForLoopInProcess(0),
     constraints(state.constraints),
 
@@ -602,10 +604,12 @@ void ExecutionState::updateLoopAnalysisForBlockTransfer
                       (BasicBlock *dst, BasicBlock *src,
                        TimingSolver* solver,
                        bool *terminate, ExecutionState **addState) {
+  //TODO: support PHI functions on the loop entrance.
+
   KFunction *kf = stack.back().kf;
+  const llvm::Loop *dstLoop = kf->loopInfo.getLoopFor(dst);
+  const llvm::Loop *srcLoop = kf->loopInfo.getLoopFor(src);
   if (!loopInProcess.isNull()) {
-    const llvm::Loop *dstLoop = kf->loopInfo.getLoopFor(dst);
-    const llvm::Loop *srcLoop = kf->loopInfo.getLoopFor(src);
     const llvm::Loop *inProcessLoop = loopInProcess->getLoop();
     if (srcLoop && inProcessLoop->contains(srcLoop)) {
       if (dstLoop && inProcessLoop->contains(dstLoop)) {
@@ -648,8 +652,19 @@ void ExecutionState::updateLoopAnalysisForBlockTransfer
   } else if (kf->loopInfo.isLoopHeader(dst)) {
     /// Remember the initial state for this loop header in
     /// case ther is an klee_induce_invariants call following.
-    LOG_LA("store the loop-head entering state, just in case.");
-    executionStateForLoopInProcess = branch();
+    if (dstLoop->contains(srcLoop) &&
+        analysedLoops.count(dstLoop)) {
+      LOG_LA("terminate loop repeating state for analyzed loop.");
+      *terminate = true;
+      *addState = 0;
+    } else {
+      LOG_LA("store the loop-head entering state, just in case.");
+      executionStateForLoopInProcess = branch();
+      *terminate = false;
+      *addState = 0;
+    }
+  } else {
+    LOG_LA("nothing interesting here");
     *terminate = false;
     *addState = 0;
   }
@@ -871,6 +886,7 @@ ExecutionState *LoopInProcess::makeRestartState() {
     LOG_LA("Nothing else changed. Restart loop "
            " in the normal mode.");
     newState->loopInProcess = 0;
+    newState->analysedLoops = newState->analysedLoops.insert(loop);
   }
   return newState;
 }

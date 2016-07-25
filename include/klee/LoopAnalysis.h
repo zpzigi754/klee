@@ -37,7 +37,7 @@ bool updateDiffMask(StateByteMask* mask,
                       const ExecutionState& state,
                       TimingSolver* solver);
 
-#define DO_LOG_LOOP_ANALYSIS
+//#define DO_LOG_LOOP_ANALYSIS
 #ifdef DO_LOG_LOOP_ANALYSIS
 #define LOG_LA(expr)                                \
   llvm::errs() <<"[LA]" <<__FILE__ <<":" <<__LINE__ \

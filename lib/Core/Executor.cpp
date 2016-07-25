@@ -1412,51 +1412,18 @@ void Executor::addState(ExecutionState *current,
 
 void Executor::handleLoopAnalysis(BasicBlock *dst, BasicBlock *src,
                                   ExecutionState &state) {
-  //TODO: support PHI functions on the loop entrance.
-  KFunction *kf = state.stack.back().kf;
-  const llvm::Loop *dstLoop = kf->loopInfo.getLoopFor(dst);
-  LoopEntryState* entryState = kf->analysedStateFor(dstLoop);
-  if (entryState) {
-    if (kf->loopInfo.isLoopHeader(dst)) {
-
-      const llvm::Loop *srcLoop = kf->loopInfo.getLoopFor(src);
-      if (dstLoop == srcLoop) {
-        // This is a backedge of the analysed loop.
-        // Normally I should check an invariant logical expression here,
-        // bot for now it is left for the developer own conscience.
-        LOG_LA("terminating loop repeating state");
-        terminateState(state);
-      } else {
-        LOG_LA("new entry to the previously analysed loop");
-        // Nothing to do here: the loop will be reanalysed for the
-        // new starting conditions. The previous mask will be rewritten
-        // with a new one. TODO: here we can do smthing smarter:
-        // cache the results, or generalise the entry conditions
-        // (forgetMask, and path conditions) on every reentry, until
-        // it is general enought so it does not require further analysis.
-
-        // Prepare for the klee_induce_invariants.
-        LOG_LA("store the loop-head entering state, just in case.");
-        state.executionStateForLoopInProcess = state.branch();
-      }
-    } else {
-      //Continue, the path currently exploring the loop right after it was
-      // analysed and all the nonstable variables havoced.
-    }
-  } else {
-    bool terminate = false;
-    ExecutionState *scheduleState = 0;
-    state.updateLoopAnalysisForBlockTransfer(dst, src,
-                                             solver,
-                                             &terminate, &scheduleState);
-    if (scheduleState) {
-      addState(&state, scheduleState);
-    }
-    if (terminate) {
-      LOG_LA("Terminating state after loop analysis update.");
-      state.doTrace = false;
-      terminateState(state);
-    }
+  bool terminate = false;
+  ExecutionState *scheduleState = 0;
+  state.updateLoopAnalysisForBlockTransfer(dst, src,
+                                           solver,
+                                           &terminate, &scheduleState);
+  if (scheduleState) {
+    addState(&state, scheduleState);
+  }
+  if (terminate) {
+    LOG_LA("Terminating state after loop analysis update.");
+    state.doTrace = false;
+    terminateState(state);
   }
 }
 
@@ -3916,8 +3883,8 @@ void Executor::induceInvariantsForThisLoop(ExecutionState &state,
 
     LOG_LA("loop being analysed:" <<loop);
 
-    if (kf->analysedStateFor(loop)) {
-      LOG_LA("The loop is already analysed. Execute normally.");
+    if (state.analysedLoops.count(loop)) {
+      LOG_LA("already analysed, continuing as nothing happened");
     } else {
       assert(state.executionStateForLoopInProcess &&
              "The initial execution state must have been stored at the entrance"
