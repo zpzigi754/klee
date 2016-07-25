@@ -14,7 +14,7 @@
 #include "klee/Expr.h"
 #include "klee/Internal/ADT/TreeStream.h"
 #include "klee/util/GetExprSymbols.h"
-#include "klee/util/BitArray.h"
+#include "klee/LoopAnalysis.h"
 
 // FIXME: We do not want to be exposing these? :(
 #include "../../lib/Core/AddressSpace.h"
@@ -141,7 +141,7 @@ private: public: //TODO a proper encapsulation.
   ExecutionState *restartState; //Owner.
   bool lastRoundUpdated;
   //Owner for the bitarrays.
-  std::map<const MemoryObject *, BitArray *> changedBytes;
+  StateByteMask changedBytes;
   //std::set<const MemoryObject *> changedObjects;
 
   ExecutionState *makeRestartState();
@@ -149,11 +149,15 @@ private: public: //TODO a proper encapsulation.
 public:
   // Captures ownership of the _headerState.
   // TODO: rewrite in terms of std::uniquePtr
-  LoopInProcess(llvm::Loop *_loop, ExecutionState *_headerState);
+  LoopInProcess(const llvm::Loop *_loop, ExecutionState *_headerState);
   ~LoopInProcess();
 
   void updateChangedObjects(const ExecutionState& current, TimingSolver* solver);
-  ExecutionState* nextRoundState(std::set<const llvm::Loop*> *analyzedLoops);
+  ExecutionState* nextRoundState(bool *analysisFinished);
+
+  const llvm::Loop *getLoop() const { return loop; }
+  const StateByteMask &getChangedBytes() const { return changedBytes; }
+  const AddressSpace &getEntryMemory() const;
 };
 
 /// @brief ExecutionState representing a path under exploration
@@ -298,7 +302,7 @@ public:
                               Expr::Width width, std::string name);
 
   void symbolizeConcretes();
-  ExecutionState* finishLoopRound(std::set<const llvm::Loop *> *analyzedLoops);
+  ExecutionState* finishLoopRound(KFunction *kf);
   void updateLoopAnalysisForBlockTransfer(llvm::BasicBlock *dst,
                                           llvm::BasicBlock *src,
                                           TimingSolver* solver,
@@ -307,14 +311,5 @@ public:
   std::vector<ref<Expr> > relevantConstraints(SymbolSet symbols) const;
 };
 }
-
-//#define DO_LOG_LOOP_ANALYSIS
-#ifdef DO_LOG_LOOP_ANALYSIS
-#define LOG_LA(expr) \
-  llvm::errs() <<"[LA]" <<__FILE__ <<":" <<__LINE__ \
-  <<": " << expr <<"\n";
-#else//DO_LOG_LOOP_ANALYSIS
-#define LOG_LA(expr)
-#endif//DO_LOG_LOOP_ANALYSIS
 
 #endif

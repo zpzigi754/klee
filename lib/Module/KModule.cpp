@@ -21,6 +21,8 @@
 #include "klee/Internal/Support/Debug.h"
 #include "klee/Internal/Support/ModuleUtil.h"
 
+#include "klee/ExecutionState.h"
+
 #include "llvm/Bitcode/ReaderWriter.h"
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include "llvm/IR/Instructions.h"
@@ -599,4 +601,26 @@ KFunction::~KFunction() {
   for (unsigned i=0; i<numInstructions; ++i)
     delete instructions[i];
   delete[] instructions;
+  for (std::map<const llvm::Loop*, LoopEntryState*>::iterator
+         it = analysedLoops.begin(),
+         ie = analysedLoops.end();
+       it != ie; ++it) {
+    delete it->second;
+  }
+
+}
+
+void KFunction::loopAnalysed(const llvm::Loop *loop,
+                             const StateByteMask& forgetMask,
+                             const AddressSpace& addressSpace) {
+  analysedLoops.insert(std::pair<const llvm::Loop*, LoopEntryState*>
+                       (loop, new LoopEntryState(forgetMask, addressSpace)));
+}
+
+LoopEntryState*
+KFunction::analysedStateFor(const llvm::Loop *loop) {
+  std::map<const llvm::Loop*, LoopEntryState*>::const_iterator i =
+    analysedLoops.find(loop);
+  if (i == analysedLoops.end()) return 0;
+  return i->second;
 }

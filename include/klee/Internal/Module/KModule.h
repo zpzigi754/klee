@@ -12,9 +12,13 @@
 
 #include "klee/Config/Version.h"
 #include "klee/Interpreter.h"
+#include "klee/LoopAnalysis.h"
 
 //TODO: generalize for otehr LLVM versions like the above
 #include <llvm/Analysis/LoopInfo.h>
+
+// FIXME: We do not want to be exposing these? :(
+#include "../../lib/Core/AddressSpace.h"
 
 #include <map>
 #include <set>
@@ -43,6 +47,16 @@ namespace klee {
   class KModule;
   template<class T> class ref;
 
+  struct LoopEntryState {
+    StateByteMask forgetMask;
+    const AddressSpace addressSpace;
+
+    LoopEntryState(const StateByteMask &_fmask,
+                   const AddressSpace &_aspace)
+      :forgetMask(_fmask), addressSpace(_aspace)
+    {}
+  };
+
   struct KFunction {
     llvm::Function *function;
 
@@ -56,9 +70,6 @@ namespace klee {
     /// Loop information is automatically calculated on initialization
     typedef llvm::LoopInfoBase<llvm::BasicBlock, llvm::Loop> LInfo;
     LInfo loopInfo;
-    /// Keep track of the loops that were analyzed on the subject of
-    /// the invariants.
-    std::set<const llvm::Loop*> analyzedLoops;
 
     /// Whether instructions in this function should count as
     /// "coverable" for statistics and search heuristics.
@@ -68,11 +79,23 @@ namespace klee {
     KFunction(const KFunction&);
     KFunction &operator=(const KFunction&);
 
+    /// Keep track of the loops that were analysed on the subject of
+    /// the invariants. Map these loops to the most general (i.e. the smallest)
+    /// set of invariants.
+    /// Owns the StateByteMask values.
+    std::map<const llvm::Loop*,
+             LoopEntryState*> analysedLoops;
+
   public:
     explicit KFunction(llvm::Function*, KModule *);
     ~KFunction();
 
     unsigned getArgRegister(unsigned index) { return index; }
+
+    void loopAnalysed(const llvm::Loop *loop,
+                      const StateByteMask& forgetMask,
+                      const AddressSpace& addressSpace);
+    LoopEntryState* analysedStateFor(const llvm::Loop *loop);
   };
 
 
