@@ -72,6 +72,9 @@ int MemoryObject::counter = 0;
 MemoryObject::~MemoryObject() {
   if (parent)
     parent->markFreed(this);
+  id = 0xdead;
+  refCount = 0xdead;
+  address = 0xdead;
 }
 
 void MemoryObject::getAllocInfo(std::string &result) const {
@@ -161,6 +164,7 @@ ObjectState::ObjectState(const ObjectState &os)
 }
 
 ObjectState::~ObjectState() {
+  assert(refCount == 0);
   if (concreteMask) delete concreteMask;
   if (flushMask) delete flushMask;
   if (knownSymbolics) delete[] knownSymbolics;

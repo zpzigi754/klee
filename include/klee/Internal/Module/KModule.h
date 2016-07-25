@@ -17,9 +17,6 @@
 //TODO: generalize for otehr LLVM versions like the above
 #include <llvm/Analysis/LoopInfo.h>
 
-// FIXME: We do not want to be exposing these? :(
-#include "../../lib/Core/AddressSpace.h"
-
 #include <map>
 #include <set>
 #include <vector>
@@ -46,16 +43,8 @@ namespace klee {
   struct KInstruction;
   class KModule;
   template<class T> class ref;
-
-  struct LoopEntryState {
-    StateByteMask forgetMask;
-    const AddressSpace addressSpace;
-
-    LoopEntryState(const StateByteMask &_fmask,
-                   const AddressSpace &_aspace)
-      :forgetMask(_fmask), addressSpace(_aspace)
-    {}
-  };
+  class ExecutionState;
+  class TimingSolver;
 
   struct KFunction {
     llvm::Function *function;
@@ -92,10 +81,11 @@ namespace klee {
 
     unsigned getArgRegister(unsigned index) { return index; }
 
-    void loopAnalysed(const llvm::Loop *loop,
-                      const StateByteMask& forgetMask,
-                      const AddressSpace& addressSpace);
+    bool insert(const llvm::Loop *loop,
+                const StateByteMask& forgetMask,
+                const ExecutionState& state);
     LoopEntryState* analysedStateFor(const llvm::Loop *loop);
+    void clearAnalysedLoops();
   };
 
 
@@ -162,6 +152,9 @@ namespace klee {
 
     /// Return an id for the given constant, creating a new one if necessary.
     unsigned getConstantID(llvm::Constant *c, KInstruction* ki);
+
+    /// Clear out the records for the analyzed loops in all the functions.
+    void clearAnalysedLoops();
   };
 } // End klee namespace
 

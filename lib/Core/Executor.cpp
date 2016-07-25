@@ -1418,8 +1418,6 @@ void Executor::handleLoopAnalysis(BasicBlock *dst, BasicBlock *src,
   LoopEntryState* entryState = kf->analysedStateFor(dstLoop);
   if (entryState) {
     if (kf->loopInfo.isLoopHeader(dst)) {
-      //TODO: reevaluate the loop for the generalized start conditions.
-      LOG_LA("Terminating the state invading into an analysed loop.");
 
       const llvm::Loop *srcLoop = kf->loopInfo.getLoopFor(src);
       if (dstLoop == srcLoop) {
@@ -1430,24 +1428,16 @@ void Executor::handleLoopAnalysis(BasicBlock *dst, BasicBlock *src,
         terminateState(state);
       } else {
         LOG_LA("new entry to the previously analysed loop");
-        assert(!dstLoop->contains(srcLoop));
-        //TODO take care of the constraints as well: we need to take only common constraints.
-        bool different = updateForgetMask(&entryState->forgetMask,
-                                          entryState->addressSpace,
-                                          state,
-                                          solver);
-        if (different) {
-          LOG_LA("turns out different - reanalyse the loop.");
-          state.loopInProcess =
-            new LoopInProcess(dstLoop,
-                              &state);
-          state.executionStateForLoopInProcess = 0;
-        } else {
-          LOG_LA("All the same, terminate the state.");
-          terminateState(state);
-        }
+        // Nothing to do here: the loop will be reanalysed for the
+        // new starting conditions. The previous mask will be rewritten
+        // with a new one. TODO: here we can do smthing smarter:
+        // cache the results, or generalise the entry conditions
+        // (forgetMask, and path conditions) on every reentry, until
+        // it is general enought so it does not require further analysis.
 
-        //TODO: calculate the new loop entry state, rerun the analysis.
+        // Prepare for the klee_induce_invariants.
+        LOG_LA("store the loop-head entering state, just in case.");
+        state.executionStateForLoopInProcess = state.branch();
       }
     } else {
       //Continue, the path currently exploring the loop right after it was
@@ -3742,6 +3732,7 @@ void Executor::runFunctionAsMain(Function *f,
   processTree = 0;
 
   // hack to clear memory objects
+  kmodule->clearAnalysedLoops(); //Must be called before delete memry;
   delete memory;
   memory = new MemoryManager(NULL);
 
