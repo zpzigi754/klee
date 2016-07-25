@@ -596,9 +596,9 @@ ExecutionState* ExecutionState::finishLoopRound(KFunction *kf) {
   ExecutionState *nextRoundState =
     loopInProcess->nextRoundState(&analysisFinished);
   if (analysisFinished) {
-    kf->loopAnalysed(loopInProcess->getLoop(),
-                     loopInProcess->getChangedBytes(),
-                     loopInProcess->getEntryMemory());
+    kf->insert(loopInProcess->getLoop(),
+               loopInProcess->getChangedBytes(),
+               loopInProcess->getEntryState());
     LOG_LA("analysis finished, loop inserted");
   }
   loopInProcess = 0;
@@ -613,7 +613,7 @@ void ExecutionState::updateLoopAnalysisForBlockTransfer
   if (!loopInProcess.isNull()) {
     const llvm::Loop *dstLoop = kf->loopInfo.getLoopFor(dst);
     const llvm::Loop *srcLoop = kf->loopInfo.getLoopFor(src);
-    const llvm::Loop *inProcessLoop = loopInProcess->loop;
+    const llvm::Loop *inProcessLoop = loopInProcess->getLoop();
     if (srcLoop && inProcessLoop->contains(srcLoop)) {
       if (dstLoop && inProcessLoop->contains(dstLoop)) {
         if (dst == inProcessLoop->getHeader()) {
@@ -639,7 +639,6 @@ void ExecutionState::updateLoopAnalysisForBlockTransfer
       if (dstLoop && inProcessLoop->contains(dstLoop)) {
         assert(dst == inProcessLoop->getHeader() &&
                "Execution may enter a loop only through the header");
-        //FIXME: reexecute the loop for the different start conditions.
         assert(loopInProcess.isNull() &&
                "Nested loop analysis is not supported.");
         loopInProcess = 0;
@@ -656,6 +655,7 @@ void ExecutionState::updateLoopAnalysisForBlockTransfer
   } else if (kf->loopInfo.isLoopHeader(dst)) {
     /// Remember the initial state for this loop header in
     /// case ther is an klee_induce_invariants call following.
+    LOG_LA("store the loop-head entering state, just in case.");
     executionStateForLoopInProcess = branch();
     *terminate = false;
     *addState = 0;
@@ -882,11 +882,12 @@ ExecutionState *LoopInProcess::makeRestartState() {
   return newState;
 }
 
+
 //TODO: move this into not-yet existing LoopAnalysis.cpp
-bool klee::updateForgetMask(StateByteMask* mask,
-                            const AddressSpace& refValues,
-                            const ExecutionState& state,
-                            TimingSolver* solver) {
+bool klee::updateDiffMask(StateByteMask* mask,
+                          const AddressSpace& refValues,
+                          const ExecutionState& state,
+                          TimingSolver* solver) {
   bool updated = false;
   for (MemoryMap::iterator
          i = refValues.objects.begin(),
@@ -896,8 +897,8 @@ bool klee::updateForgetMask(StateByteMask* mask,
     const ObjectState *refOs = i->second;
     const ObjectState *os = state.addressSpace.findObject(obj);
     if (refOs == os) continue;
-    std::pair<std::map<const MemoryObject *, BitArray *>::iterator,
-              bool> insRez = mask->insert
+    std::pair<std::map<const MemoryObject *, BitArray *>::iterator, bool>
+      insRez = mask->insert
       (std::pair<const MemoryObject *, BitArray *>(obj, 0));
     if (insRez.second) insRez.first->second =
                          new BitArray(obj->size);
@@ -932,10 +933,10 @@ bool klee::updateForgetMask(StateByteMask* mask,
 
 void LoopInProcess::updateChangedObjects(const ExecutionState& current,
                                          TimingSolver* solver) {
-  bool updated = updateForgetMask(&changedBytes,
-                                  restartState->addressSpace,
-                                  current,
-                                  solver);
+  bool updated = updateDiffMask(&changedBytes,
+                                restartState->addressSpace,
+                                current,
+                                solver);
   if (updated) lastRoundUpdated = true;
 }
 
@@ -958,6 +959,3 @@ ExecutionState *LoopInProcess::nextRoundState(bool *analysisFinished) {
   return 0;
 }
 
-const AddressSpace &LoopInProcess::getEntryMemory() const {
-  return restartState->addressSpace;
-}
