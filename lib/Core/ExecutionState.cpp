@@ -659,12 +659,16 @@ void ExecutionState::updateLoopAnalysisForBlockTransfer
   } else if (kf->loopInfo.isLoopHeader(dst)) {
     /// Remember the initial state for this loop header in
     /// case ther is an klee_induce_invariants call following.
-    if (dstLoop->contains(srcLoop) &&
-        analysedLoops.count(dstLoop)) {
-      LOG_LA("terminate loop repeating state for analyzed loop.");
-      *terminate = true;
-      *addState = 0;
+    if (dstLoop->contains(srcLoop)) {
+      if (analysedLoops.count(dstLoop)) {
+        LOG_LA("terminate loop repeating state for analyzed loop.");
+        *terminate = true;
+        *addState = 0;
+      }
     } else {
+      // Get ready for the next analysis run, which may have
+      // different starting conditions.
+      analysedLoops = analysedLoops.remove(dstLoop);
       LOG_LA("store the loop-head entering state, just in case.");
       executionStateForLoopInProcess = branch();
       *terminate = false;
