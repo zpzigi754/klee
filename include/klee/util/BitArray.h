@@ -10,6 +10,9 @@
 #ifndef KLEE_UTIL_BITARRAY_H
 #define KLEE_UTIL_BITARRAY_H
 
+#include <stdint.h>
+#include <string.h>
+
 namespace klee {
 
   // XXX would be nice not to have

@@ -14,6 +14,7 @@
 #include "klee/Internal/Module/KInstruction.h"
 #include "klee/Internal/Module/KModule.h"
 #include "TimingSolver.h"
+#include "klee/LoopAnalysis.h"
 
 #include "klee/Expr.h"
 
@@ -590,9 +591,16 @@ void ExecutionState::symbolizeConcretes() {
   }
 }
 
-ExecutionState* ExecutionState::finishLoopRound(std::set<const llvm::Loop *>
-                                                *analyzedLoops) {
-  ExecutionState *nextRoundState = loopInProcess->nextRoundState(analyzedLoops);
+ExecutionState* ExecutionState::finishLoopRound(KFunction *kf) {
+  bool analysisFinished = false;
+  ExecutionState *nextRoundState =
+    loopInProcess->nextRoundState(&analysisFinished);
+  if (analysisFinished) {
+    kf->loopAnalysed(loopInProcess->getLoop(),
+                     loopInProcess->getChangedBytes(),
+                     loopInProcess->getEntryMemory());
+    LOG_LA("analysis finished, loop inserted");
+  }
   loopInProcess = 0;
   return nextRoundState;
 }
@@ -612,7 +620,7 @@ void ExecutionState::updateLoopAnalysisForBlockTransfer
           LOG_LA("Ok, we got to the header.");
           loopInProcess->updateChangedObjects(*this, solver);
           LOG_LA("refcount: " <<loopInProcess->refCount);
-          *addState = finishLoopRound(&kf->analyzedLoops);
+          *addState = finishLoopRound(kf);
           LOG_LA("Terminating the loop-repeating state.");
           loopInProcess = 0;
           *terminate = true;
@@ -622,7 +630,7 @@ void ExecutionState::updateLoopAnalysisForBlockTransfer
           *addState = 0;
         }
       } else {
-        *addState = finishLoopRound(&kf->analyzedLoops);
+        *addState = finishLoopRound(kf);
         LOG_LA("Terminating loop-escaping state.");
         loopInProcess = 0;
         *terminate = true;
@@ -631,16 +639,16 @@ void ExecutionState::updateLoopAnalysisForBlockTransfer
       if (dstLoop && inProcessLoop->contains(dstLoop)) {
         assert(dst == inProcessLoop->getHeader() &&
                "Execution may enter a loop only through the header");
+        //FIXME: reexecute the loop for the different start conditions.
         assert(loopInProcess.isNull() &&
                "Nested loop analysis is not supported.");
         loopInProcess = 0;
-        //FIXME: reexecute the loop for the different start conditions.
         assert(false && "No support for loop-with-invariant reentry.");
         LOG_LA("Terminating loop-invading state.");
         *terminate = true;
         *addState = 0;
       } else {
-        //The execution left the loop being analyzed for a function call.
+        //The execution left the loop being analysed for a function call.
         *terminate = false;
         *addState = 0;
       }
@@ -807,7 +815,7 @@ SymbolSet CallInfo::computeSymbolicVariablesSet() const {
   return symbols;
 }
 
-LoopInProcess::LoopInProcess(llvm::Loop *_loop,
+LoopInProcess::LoopInProcess(const llvm::Loop *_loop,
                              ExecutionState *_headerState)
   :refCount(0), loop(_loop), restartState(_headerState),
    lastRoundUpdated(false)
@@ -874,18 +882,22 @@ ExecutionState *LoopInProcess::makeRestartState() {
   return newState;
 }
 
-void LoopInProcess::updateChangedObjects(const ExecutionState& current,
-                                         TimingSolver* solver) {
+//TODO: move this into not-yet existing LoopAnalysis.cpp
+bool klee::updateForgetMask(StateByteMask* mask,
+                            const AddressSpace& refValues,
+                            const ExecutionState& state,
+                            TimingSolver* solver) {
+  bool updated = false;
   for (MemoryMap::iterator
-         i = restartState->addressSpace.objects.begin(),
-         e = restartState->addressSpace.objects.end();
+         i = refValues.objects.begin(),
+         e = refValues.objects.end();
        i != e; ++i) {
     const MemoryObject *obj = i->first;
-    const ObjectState *headOs = i->second;
-    const ObjectState *beOs = current.addressSpace.findObject(obj);
-    if (headOs == beOs) continue;
+    const ObjectState *refOs = i->second;
+    const ObjectState *os = state.addressSpace.findObject(obj);
+    if (refOs == os) continue;
     std::pair<std::map<const MemoryObject *, BitArray *>::iterator,
-              bool> insRez = changedBytes.insert
+              bool> insRez = mask->insert
       (std::pair<const MemoryObject *, BitArray *>(obj, 0));
     if (insRez.second) insRez.first->second =
                          new BitArray(obj->size);
@@ -894,42 +906,58 @@ void LoopInProcess::updateChangedObjects(const ExecutionState& current,
     unsigned size = obj->size;
     for (unsigned j = 0; j < size; ++j) {
       if (bytes->get(j)) continue;
-      ref<Expr> headVal = headOs->read8(j);
-      ref<Expr> beVal = beOs->read8(j);
-      if (0 != headVal->compare(*beVal)) {
+      ref<Expr> refVal = refOs->read8(j);
+      ref<Expr> val = os->read8(j);
+      if (0 != refVal->compare(*val)) {
         //So: this byte was not diferent on the previous round,
-        // it also differs structurally now. It is time to make
+        // it also differs structuraly now. It is time to make
         // sure it can be really different.
 
         solver->setTimeout(0.01);//TODO: determine a correct argument here.
         bool mayDiffer = true;
-        bool solverRes = solver->mayBeFalse(current, EqExpr::create(headVal, beVal),
+        bool solverRes = solver->mayBeFalse(state, EqExpr::create(refVal, val),
                                             /*&*/mayDiffer);
         solver->setTimeout(0);
         //assert(solverRes &&
-        //       "Solver failed in computing whther a byte changed or not.");
+        //       "Solver failed in computing whether a byte changed or not.");
         if (solverRes && mayDiffer) {
           bytes->set(j);
-          lastRoundUpdated = true;
+          updated = true;
         }
       }
     }
   }
+  return updated;
 }
 
-ExecutionState* LoopInProcess::nextRoundState(std::set<const llvm::Loop *>
-                                              *analyzedLoops) {
+void LoopInProcess::updateChangedObjects(const ExecutionState& current,
+                                         TimingSolver* solver) {
+  bool updated = updateForgetMask(&changedBytes,
+                                  restartState->addressSpace,
+                                  current,
+                                  solver);
+  if (updated) lastRoundUpdated = true;
+}
+
+ExecutionState *LoopInProcess::nextRoundState(bool *analysisFinished) {
   if (refCount == 1) {
     //The last state in the round.
     if (!lastRoundUpdated) {
       LOG_LA("Fixpoint reached. Time to"
              " restart the iteration in the normal mode.");
-      analyzedLoops->insert(loop);
+      *analysisFinished = true;
+    } else {
+      *analysisFinished = false;
     }
     // Order is important; makeRestartState clears the
     // lastRoundUpdated flag.
     LOG_LA("Schedule a fresh copy of the restart state for the loop");
     return makeRestartState();
   }
+  *analysisFinished = false;
   return 0;
+}
+
+const AddressSpace &LoopInProcess::getEntryMemory() const {
+  return restartState->addressSpace;
 }
