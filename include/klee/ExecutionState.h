@@ -135,7 +135,7 @@ public:
   /// for the ref class. This count also determines how many
   /// paths are in the loop.
   int refCount;
-private: public: //TODO a proper encapsulation.
+private:
   const llvm::Loop *loop; //Owner: KFunction::loopInfo
   // No circular dependency here: the restartState must not have
   // loop in process.
@@ -158,7 +158,7 @@ public:
 
   const llvm::Loop *getLoop() const { return loop; }
   const StateByteMask &getChangedBytes() const { return changedBytes; }
-  const AddressSpace &getEntryMemory() const;
+  const ExecutionState &getEntryState() const { return *restartState; }
 };
 
 /// @brief ExecutionState representing a path under exploration
