@@ -1379,34 +1379,46 @@ void Executor::addState(ExecutionState *current,
 
 void Executor::handleLoopAnalysis(BasicBlock *dst, BasicBlock *src,
                                   ExecutionState &state) {
-  const KFunction *kf = state.stack.back().kf;
+  //TODO: support PHI functions on the loop entrance.
+  KFunction *kf = state.stack.back().kf;
   const llvm::Loop *dstLoop = kf->loopInfo.getLoopFor(dst);
-  if (kf->analyzedLoops.find(dstLoop) !=
-      kf->analyzedLoops.end()) {
+  LoopEntryState* entryState = kf->analysedStateFor(dstLoop);
+  if (entryState) {
     if (kf->loopInfo.isLoopHeader(dst)) {
       //TODO: reevaluate the loop for the generalized start conditions.
-      LOG_LA("Terminating the state invading into an analyzed loop.");
-      /*
-        Commented out, because we do need to trace even the ivading states.
-        Better if we actually continue them with proper loop-invariant
-        generalization/alteratoin and reanalyzis.
-
-        Also, we must trace the backedge states as well as the others.
+      LOG_LA("Terminating the state invading into an analysed loop.");
 
       const llvm::Loop *srcLoop = kf->loopInfo.getLoopFor(src);
-      if (!dstLoop->contains(srcLoop)) {
-        // This is a backedge of the analyzed loop.
+      if (dstLoop == srcLoop) {
+        // This is a backedge of the analysed loop.
         // Normally I should check an invariant logical expression here,
         // bot for now it is left for the developer own conscience.
+        LOG_LA("terminating loop repeating state");
+        terminateState(state);
       } else {
-        // 
-        state.doTrace = false;
+        LOG_LA("new entry to the previously analysed loop");
+        assert(!dstLoop->contains(srcLoop));
+        //TODO take care of the constraints as well: we need to take only common constraints.
+        bool different = updateForgetMask(&entryState->forgetMask,
+                                          entryState->addressSpace,
+                                          state,
+                                          solver);
+        if (different) {
+          LOG_LA("turns out different - reanalyse the loop.");
+          state.loopInProcess =
+            new LoopInProcess(dstLoop,
+                              &state);
+          state.executionStateForLoopInProcess = 0;
+        } else {
+          LOG_LA("All the same, terminate the state.");
+          terminateState(state);
+        }
+
+        //TODO: calculate the new loop entry state, rerun the analysis.
       }
-      */
-      terminateState(state);
     } else {
       //Continue, the path currently exploring the loop right after it was
-      // analyzed and all the nonstable variables havoced.
+      // analysed and all the nonstable variables havoced.
     }
   } else {
     bool terminate = false;
@@ -1690,13 +1702,10 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       if (statsTracker && state.stack.back().kf->trackCoverage)
         statsTracker->markBranchVisited(branches.first, branches.second);
 
-      LOG_LA( "Branching.");
       if (branches.first) {
-        LOG_LA( "going then");
         transferToBasicBlock(bi->getSuccessor(0), bi->getParent(), *branches.first);
       }
       if (branches.second) {
-        LOG_LA( "going else");
         transferToBasicBlock(bi->getSuccessor(1), bi->getParent(), *branches.second);
       }
     }
@@ -4067,11 +4076,10 @@ void Executor::induceInvariantsForThisLoop(ExecutionState &state,
 
     Loop* loop = loopInfo.getLoopFor(bb);
 
-    LOG_LA("loop being analyzed:" <<loop);
+    LOG_LA("loop being analysed:" <<loop);
 
-    if (kf->analyzedLoops.find(loop) !=
-        kf->analyzedLoops.end()) {
-      LOG_LA("The loop is already analyzed. Execute normally.");
+    if (kf->analysedStateFor(loop)) {
+      LOG_LA("The loop is already analysed. Execute normally.");
     } else {
       assert(state.executionStateForLoopInProcess &&
              "The initial execution state must have been stored at the entrance"
