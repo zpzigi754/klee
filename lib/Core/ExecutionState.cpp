@@ -590,87 +590,127 @@ ExecutionState* ExecutionState::finishLoopRound(KFunction *kf) {
   bool analysisFinished = false;
   ExecutionState *nextRoundState =
     loopInProcess->nextRoundState(&analysisFinished);
+  //TODO: here analysis may never finish, e.g. if inside the analysed loop
+  // there is an infinite loop somewhere. If we cound detect infinite loops,
+  // we may ensure that the analysis finishes. Otherwise, Klee will be blocked
+  // on this loop, even though there are paths that avoid that infinite loop,
+  // and the search heuristic may guide execution away.
   if (analysisFinished) {
     kf->insert(loopInProcess->getLoop(),
                loopInProcess->getChangedBytes(),
                loopInProcess->getEntryState());
-    LOG_LA("analysis finished, loop inserted");
+    LOG_LA("[" << loopInProcess->getLoop() << "]analysis finished, loop inserted");
   }
-  loopInProcess = 0;
   return nextRoundState;
+}
+
+void ExecutionState::loopRepetition(const llvm::Loop *dstLoop,
+                                    TimingSolver *solver,
+                                    bool *terminate) {
+  //TODO: detect infinite loops.
+  LOG_LA("Loop repetition");
+  if (!loopInProcess.isNull()) {
+    if (loopInProcess->getLoop() == dstLoop) {
+      LOG_LA("[" << loopInProcess->getLoop() << "]The loop is in process.")
+      loopInProcess->updateChangedObjects(*this, solver);
+      LOG_LA("refcount: " <<loopInProcess->refCount);
+      LOG_LA("Terminating the loop-repeating state.");
+      *terminate = true;
+      return;
+    }
+  }
+  if (analysedLoops.count(dstLoop)) {
+    LOG_LA("terminate loop repeating state for an analyzed loop.");
+    *terminate = true;
+    return;
+  }
+  *terminate = false;
+}
+
+void ExecutionState::loopEnter(const llvm::Loop *dstLoop) {
+  LOG_LA("Loop enter");
+  // Get ready for the next analysis run, which may have
+  // different starting conditions.
+  LOG_LA("Remove the loop from the analyzed set - prepare"
+         " to repeat the analysis.");
+  analysedLoops = analysedLoops.remove(dstLoop);
+  /// Remember the initial state for this loop header in
+  /// case ther is an klee_induce_invariants call following.
+  LOG_LA("store the loop-head entering state,"
+         " just in case.");
+  executionStateForLoopInProcess = branch();
+}
+
+void ExecutionState::loopExit(const llvm::Loop *srcLoop,
+                              bool *terminate) {
+  LOG_LA("Loop exit");
+  if (!loopInProcess.isNull()) {
+    if (loopInProcess->getLoop() == srcLoop) {
+      LOG_LA("[" << loopInProcess->getLoop() << "]The loop is in process");
+      LOG_LA("Terminating loop-escaping state.");
+      *terminate = true;
+      return;
+    }
+  }
+  *terminate = false;
 }
 
 void ExecutionState::updateLoopAnalysisForBlockTransfer
                       (BasicBlock *dst, BasicBlock *src,
                        TimingSolver* solver,
-                       bool *terminate, ExecutionState **addState) {
+                       bool *terminate) {
   //TODO: support PHI functions on the loop entrance.
 
   KFunction *kf = stack.back().kf;
   const llvm::Loop *dstLoop = kf->loopInfo.getLoopFor(dst);
   const llvm::Loop *srcLoop = kf->loopInfo.getLoopFor(src);
-  if (!loopInProcess.isNull()) {
-    const llvm::Loop *inProcessLoop = loopInProcess->getLoop();
-    if (srcLoop && inProcessLoop->contains(srcLoop)) {
-      if (dstLoop && inProcessLoop->contains(dstLoop)) {
-        if (dst == inProcessLoop->getHeader()) {
-          LOG_LA("Ok, we got to the header.");
-          loopInProcess->updateChangedObjects(*this, solver);
-          LOG_LA("refcount: " <<loopInProcess->refCount);
-          *addState = finishLoopRound(kf);
-          LOG_LA("Terminating the loop-repeating state.");
-          loopInProcess = 0;
-          *terminate = true;
+  *terminate = false;
+  if (srcLoop) {
+    if (dstLoop) {
+      if (srcLoop == dstLoop) {
+        if (dst == dstLoop->getHeader()) {
+          //Loop repetition.
+          loopRepetition(dstLoop, solver, terminate);
         } else {
-          //Do nothing. the state is stil in the loop.
-          *terminate = false;
-          *addState = 0;
+          //In-loop transition
+        }
+      } else if (srcLoop->contains(dstLoop)) {
+        //Nested loop enter
+        assert(dstLoop->getHeader() == dst);
+        loopEnter(dstLoop);
+      } else if (dstLoop->contains(srcLoop)) {
+        //Nested loop exit
+        loopExit(srcLoop, terminate);
+        if (dst == dstLoop->getHeader()) {
+          //Loop repetition.
+          loopRepetition(dstLoop, solver, terminate);
         }
       } else {
-        *addState = finishLoopRound(kf);
-        LOG_LA("Terminating loop-escaping state.");
-        loopInProcess = 0;
-        *terminate = true;
+        //Transition from one loop to another
+        //Loop enter + Loop exit
+        assert(dstLoop->getHeader() == dst);
+        loopEnter(dstLoop);
+        loopExit(srcLoop, terminate);
       }
     } else {
-      if (dstLoop && inProcessLoop->contains(dstLoop)) {
-        assert(dst == inProcessLoop->getHeader() &&
-               "Execution may enter a loop only through the header");
-        assert(loopInProcess.isNull() &&
-               "Nested loop analysis is not supported.");
-        loopInProcess = 0;
-        assert(false && "No support for loop-with-invariant reentry.");
-        LOG_LA("Terminating loop-invading state.");
-        *terminate = true;
-        *addState = 0;
-      } else {
-        //The execution left the loop being analysed for a function call.
-        *terminate = false;
-        *addState = 0;
-      }
-    }
-  } else if (kf->loopInfo.isLoopHeader(dst)) {
-    /// Remember the initial state for this loop header in
-    /// case ther is an klee_induce_invariants call following.
-    if (dstLoop->contains(srcLoop)) {
-      if (analysedLoops.count(dstLoop)) {
-        LOG_LA("terminate loop repeating state for analyzed loop.");
-        *terminate = true;
-        *addState = 0;
-      }
-    } else {
-      // Get ready for the next analysis run, which may have
-      // different starting conditions.
-      analysedLoops = analysedLoops.remove(dstLoop);
-      LOG_LA("store the loop-head entering state, just in case.");
-      executionStateForLoopInProcess = branch();
-      *terminate = false;
-      *addState = 0;
+      //Loop exit
+      loopExit(srcLoop, terminate);
     }
   } else {
-    LOG_LA("nothing interesting here");
-    *terminate = false;
-    *addState = 0;
+    if (dstLoop) {
+      //Loop enter
+      assert(dstLoop->getHeader() == dst);
+      loopEnter(dstLoop);
+    } else {
+      //Out-of-loop transition.
+    }
+  }
+}
+
+void ExecutionState::terminateState(ExecutionState** replace) {
+  if (!loopInProcess.isNull()) {
+    *replace = finishLoopRound(stack.back().kf);
+    loopInProcess = 0;
   }
 }
 
@@ -828,8 +868,9 @@ SymbolSet CallInfo::computeSymbolicVariablesSet() const {
 }
 
 LoopInProcess::LoopInProcess(const llvm::Loop *_loop,
-                             ExecutionState *_headerState)
-  :refCount(0), loop(_loop), restartState(_headerState),
+                             ExecutionState *_headerState,
+                             const ref<LoopInProcess> &_outer)
+  :refCount(0), outer(_outer), loop(_loop), restartState(_headerState),
    lastRoundUpdated(false)
 {
   //TODO: this can not belong here. It has nothing to do with execution state,
@@ -881,15 +922,16 @@ ExecutionState *LoopInProcess::makeRestartState() {
     wos->forgetThese(bytes);
   }
   if (lastRoundUpdated) {
-    LOG_LA("Some more objects were changed."
+    LOG_LA("[" << loop << "]Some more objects were changed."
            " repeat the loop.");
     lastRoundUpdated = false;
     //This works, because refCount is the internal field.
     newState->loopInProcess = this;
   } else {
-    LOG_LA("Nothing else changed. Restart loop "
+    LOG_LA("[" << loop << "]Nothing else changed."
+           " Restart loop "
            " in the normal mode.");
-    newState->loopInProcess = 0;
+    newState->loopInProcess = outer;
     newState->analysedLoops = newState->analysedLoops.insert(loop);
   }
   return newState;
@@ -957,7 +999,7 @@ ExecutionState *LoopInProcess::nextRoundState(bool *analysisFinished) {
   if (refCount == 1) {
     //The last state in the round.
     if (!lastRoundUpdated) {
-      LOG_LA("Fixpoint reached. Time to"
+      LOG_LA("[" << loop << "]Fixpoint reached. Time to"
              " restart the iteration in the normal mode.");
       *analysisFinished = true;
     } else {
@@ -965,10 +1007,10 @@ ExecutionState *LoopInProcess::nextRoundState(bool *analysisFinished) {
     }
     // Order is important; makeRestartState clears the
     // lastRoundUpdated flag.
-    LOG_LA("Schedule a fresh copy of the restart state for the loop");
+    LOG_LA("[" << loop << "]Schedule a fresh copy of the"
+           " restart state for the loop");
     return makeRestartState();
   }
   *analysisFinished = false;
   return 0;
 }
-

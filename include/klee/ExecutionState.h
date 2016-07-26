@@ -136,6 +136,7 @@ public:
   /// paths are in the loop.
   int refCount;
 private:
+  ref<LoopInProcess> outer;
   const llvm::Loop *loop; //Owner: KFunction::loopInfo
   // No circular dependency here: the restartState must not have
   // loop in process.
@@ -150,7 +151,8 @@ private:
 public:
   // Captures ownership of the _headerState.
   // TODO: rewrite in terms of std::uniquePtr
-  LoopInProcess(const llvm::Loop *_loop, ExecutionState *_headerState);
+  LoopInProcess(const llvm::Loop *_loop, ExecutionState *_headerState,
+                const ref<LoopInProcess> &_outer);
   ~LoopInProcess();
 
   void updateChangedObjects(const ExecutionState& current, TimingSolver* solver);
@@ -159,6 +161,7 @@ public:
   const llvm::Loop *getLoop() const { return loop; }
   const StateByteMask &getChangedBytes() const { return changedBytes; }
   const ExecutionState &getEntryState() const { return *restartState; }
+  const ref<LoopInProcess> &getOuter() const { return outer; }
 };
 
 /// @brief ExecutionState representing a path under exploration
@@ -195,6 +198,7 @@ public:
   AddressSpace addressSpace;
 
   /// @brief Information necessary for loop invariant induction.
+  /// This is a stack capable of tracking loop nests.
   /// Owner.
   ref<LoopInProcess> loopInProcess;
 
@@ -269,6 +273,14 @@ public:
 private:
   ExecutionState() : ptreeNode(0) {}
 
+
+  void loopRepetition(const llvm::Loop *dstLoop,
+                      TimingSolver *solver,
+                      bool *terminate);
+  void loopEnter(const llvm::Loop *dstLoop);
+  void loopExit(const llvm::Loop *srcLoop,
+                bool *terminate);
+
 public:
   ExecutionState(KFunction *kf);
 
@@ -312,9 +324,9 @@ public:
   void updateLoopAnalysisForBlockTransfer(llvm::BasicBlock *dst,
                                           llvm::BasicBlock *src,
                                           TimingSolver* solver,
-                                          bool *terminate,
-                                          ExecutionState **addState);
+                                          bool *terminate);
   std::vector<ref<Expr> > relevantConstraints(SymbolSet symbols) const;
+  void terminateState(ExecutionState** replace);
 };
 }
 
