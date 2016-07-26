@@ -327,6 +327,8 @@ public:
                                           bool *terminate);
   std::vector<ref<Expr> > relevantConstraints(SymbolSet symbols) const;
   void terminateState(ExecutionState** replace);
+  void induceInvariantsForThisLoop(KInstruction *target);
+  void startInvariantSearch();
 };
 }
 

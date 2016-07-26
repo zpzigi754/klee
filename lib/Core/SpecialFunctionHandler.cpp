@@ -882,5 +882,5 @@ void SpecialFunctionHandler::handleForgetAll
 
 void SpecialFunctionHandler::handleInduceInvariants
 (ExecutionState &state, KInstruction *target, std::vector<ref<Expr> > &arguments) {
-  executor.induceInvariantsForThisLoop(state, target);
+  state.induceInvariantsForThisLoop(target);
 }
