@@ -639,6 +639,7 @@ void ExecutionState::loopEnter(const llvm::Loop *dstLoop) {
   LOG_LA("store the loop-head entering state,"
          " just in case.");
   executionStateForLoopInProcess = branch();
+  executionStateForLoopInProcess->loopInProcess = 0;
 }
 
 void ExecutionState::loopExit(const llvm::Loop *srcLoop,
@@ -659,8 +660,6 @@ void ExecutionState::updateLoopAnalysisForBlockTransfer
                       (BasicBlock *dst, BasicBlock *src,
                        TimingSolver* solver,
                        bool *terminate) {
-  //TODO: support PHI functions on the loop entrance.
-
   KFunction *kf = stack.back().kf;
   const llvm::Loop *dstLoop = kf->loopInfo.getLoopFor(dst);
   const llvm::Loop *srcLoop = kf->loopInfo.getLoopFor(src);
