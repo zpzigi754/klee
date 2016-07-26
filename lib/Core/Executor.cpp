@@ -2967,9 +2967,9 @@ void Executor::terminateState(ExecutionState &state) {
                       "replay did not consume all objects in test input.");
   }
 
-  if (state.loopInProcess.isNull() &&
-      state.doTrace) {
-    interpreterHandler->processCallPath(state);
+  if (state.loopInProcess.isNull()) {
+    if (state.doTrace)
+      interpreterHandler->processCallPath(state);
     interpreterHandler->incPathsExplored();
   }
 
