@@ -1979,12 +1979,31 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     break;
   }
   case Instruction::PHI: {
+    if ((!state.loopInProcess.isNull() ||
+        (!state.analysedLoops.empty() &&
+         state.analysedLoops.count(state.stack.back().kf->loopInfo.getLoopFor
+                                   (ki->inst->getParent())))) &&
+        state.stack.back().kf->loopInfo.isLoopHeader
+        (ki->inst->getParent())) {
+      // Warning: untested!
+      LOG_LA("Making PHI symbolic");
+      Expr::Width w = getWidthForLLVMType(ki->inst->getType());
+      static unsigned genId = 0;
+      const Array *array =
+        arrayCache.CreateArray("PHI_reset" + llvm::utostr(++genId),
+                               (w+7)/8);
+      UpdateList ul(array, 0);
+      // TODO: how do you specify width here?
+      ref<Expr> result = ReadExpr::create(ul, ConstantExpr::alloc(0, Expr::Int32));
+      bindLocal(ki, state, result);
+    } else {
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 0)
-    ref<Expr> result = eval(ki, state.incomingBBIndex, state).value;
+      ref<Expr> result = eval(ki, state.incomingBBIndex, state).value;
 #else
-    ref<Expr> result = eval(ki, state.incomingBBIndex * 2, state).value;
+      ref<Expr> result = eval(ki, state.incomingBBIndex * 2, state).value;
 #endif
-    bindLocal(ki, state, result);
+      bindLocal(ki, state, result);
+    }
     break;
   }
 
