@@ -1,3 +1,14 @@
+// RUN: %llvmgcc %s -emit-llvm -g -c -o %t1.bc
+// RUN: rm -rf %t.klee-out
+// RUN: %klee --output-dir=%t.klee-out --exit-on-error %t1.bc > %t1.log
+
+// RUN: grep "bigger" %t1.log
+// RUN: grep "less" %t1.log
+// RUN: grep "eq5" %t1.log
+// RUN: grep "noneq5" %t1.log
+// RUN: grep "eq10" %t1.log
+// RUN: grep "noneq10" %t1.log
+
 #include <klee/klee.h>
 
 #include <stdlib.h>
