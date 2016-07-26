@@ -1380,13 +1380,9 @@ void Executor::addState(ExecutionState *current,
 void Executor::handleLoopAnalysis(BasicBlock *dst, BasicBlock *src,
                                   ExecutionState &state) {
   bool terminate = false;
-  ExecutionState *scheduleState = 0;
   state.updateLoopAnalysisForBlockTransfer(dst, src,
                                            solver,
-                                           &terminate, &scheduleState);
-  if (scheduleState) {
-    addState(&state, scheduleState);
-  }
+                                           &terminate);
   if (terminate) {
     LOG_LA("Terminating state after loop analysis update.");
     state.doTrace = false;
@@ -1975,6 +1971,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         state.stack.back().kf->loopInfo.isLoopHeader
         (ki->inst->getParent())) {
       // Warning: untested!
+      // TODO: make sure all the PHIs are actually lifted in the loop header,
+      // and not left somewhere in the middle of the loop.
       LOG_LA("Making PHI symbolic");
       Expr::Width w = getWidthForLLVMType(ki->inst->getType());
       static unsigned genId = 0;
@@ -3000,6 +2998,11 @@ void Executor::terminateState(ExecutionState &state) {
     interpreterHandler->processCallPath(state);
     interpreterHandler->incPathsExplored();
   }
+
+  ExecutionState *replacement = 0;
+  state.terminateState(&replacement);
+  assert(replacement != &state);
+  if (replacement) addState(&state, replacement);
 
   std::vector<ExecutionState *>::iterator it =
       std::find(addedStates.begin(), addedStates.end(), &state);
@@ -4040,47 +4043,43 @@ Interpreter *Interpreter::create(LLVMContext &ctx, const InterpreterOptions &opt
 void Executor::induceInvariantsForThisLoop(ExecutionState &state,
                                            KInstruction *target)
 {
-  //TODO: we may use an additional field to keep the previous
-  // loopInProcess for nested loop-invariant analysis.
+  KInstruction *inst = state.prevPC;
+  llvm::Instruction *linst = inst->inst;
+  assert(linst);
+  LOG_LA(linst->getOpcodeName());
+  BasicBlock *bb = linst->getParent();
+  assert(bb);
 
-  if (state.loopInProcess.isNull()) {
+  KFunction *kf = state.stack.back().kf;
+  const KFunction::LInfo &loopInfo = kf->loopInfo;
+
+  const llvm::Loop* loop = loopInfo.getLoopFor(bb);
+
+  LOG_LA("loop being analysed:" <<loop);
+  if ((state.loopInProcess.isNull() ||
+       state.loopInProcess->getLoop() != loop) &&
+      state.analysedLoops.count(loop) == 0) {
     LOG_LA("Start search for loop invariants.");
-    KInstruction *inst = state.prevPC;
-    llvm::Instruction *linst = inst->inst;
-    assert(linst);
-    LOG_LA(linst->getOpcodeName());
-    BasicBlock *bb = linst->getParent();
-    assert(bb);
 
-    KFunction *kf = state.stack.back().kf;
-    const KFunction::LInfo &loopInfo = kf->loopInfo;
+    assert(state.executionStateForLoopInProcess &&
+           "The initial execution state must have been stored at the entrance"
+           " of the loop header block.");
 
-    Loop* loop = loopInfo.getLoopFor(bb);
+    assert(!loopInfo.empty());
+    assert(loop &&
+           "The klee_induce_invariants must be placed into the condition"
+           " of a loop.");
+    assert(loopInfo.isLoopHeader(bb) &&
+           "The klee_induce_invariants must be placed into the condition"
+           " of a loop.");
 
-    LOG_LA("loop being analysed:" <<loop);
-
-    if (state.analysedLoops.count(loop)) {
-      LOG_LA("already analysed, continuing as nothing happened");
-    } else {
-      assert(state.executionStateForLoopInProcess &&
-             "The initial execution state must have been stored at the entrance"
-             " of the loop header block.");
-
-      assert(!loopInfo.empty());
-      assert(loop &&
-             "The klee_induce_invariants must be placed into the condition"
-             " of a loop.");
-      assert(loopInfo.isLoopHeader(bb) &&
-             "The klee_induce_invariants must be placed into the condition"
-             " of a loop.");
-
-      state.loopInProcess =
-        new LoopInProcess(loop,
-                          state.executionStateForLoopInProcess);
-      state.executionStateForLoopInProcess = 0;
-    }
+    state.loopInProcess =
+      new LoopInProcess(loop,
+                        state.executionStateForLoopInProcess,
+                        state.loopInProcess);
+    state.executionStateForLoopInProcess = 0;
   } else {
-    LOG_LA("Already searching for loop invariants");
+    LOG_LA("Already analysed, or being analysed at this very moment");
   }
 
   bindLocal(target, state, ConstantExpr::create(0xffffffff, Expr::Int32));
