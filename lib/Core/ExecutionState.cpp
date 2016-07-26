@@ -721,6 +721,56 @@ void ExecutionState::terminateState(ExecutionState** replace) {
   }
 }
 
+void ExecutionState::startInvariantSearch() {
+  KInstruction *inst = prevPC;
+  llvm::Instruction *linst = inst->inst;
+  assert(linst);
+  LOG_LA(linst->getOpcodeName());
+  BasicBlock *bb = linst->getParent();
+  assert(bb);
+
+  KFunction *kf = stack.back().kf;
+  const KFunction::LInfo &loopInfo = kf->loopInfo;
+
+  const llvm::Loop* loop = loopInfo.getLoopFor(bb);
+
+  LOG_LA("loop being analysed:" <<loop);
+  if ((loopInProcess.isNull() ||
+       loopInProcess->getLoop() != loop) &&
+      analysedLoops.count(loop) == 0) {
+    LOG_LA("Start search for loop invariants.");
+
+    assert(executionStateForLoopInProcess &&
+           "The initial execution state must have been stored at the entrance"
+           " of the loop header block.");
+
+    assert(!loopInfo.empty());
+    assert(loop &&
+           "The klee_induce_invariants must be placed into the condition"
+           " of a loop.");
+    assert(loopInfo.isLoopHeader(bb) &&
+           "The klee_induce_invariants must be placed into the condition"
+           " of a loop.");
+
+    loopInProcess =
+      new LoopInProcess(loop,
+                        executionStateForLoopInProcess,
+                        loopInProcess);
+    executionStateForLoopInProcess = 0;
+  } else {
+    LOG_LA("Already analysed, or being analysed at this very moment");
+  }
+}
+
+void ExecutionState::induceInvariantsForThisLoop(KInstruction *target)
+{
+  startInvariantSearch();
+
+  //The return value of the intrinsic function call.
+  stack.back().locals[target->dest].value =
+    ConstantExpr::create(0xffffffff, Expr::Int32);
+}
+
 bool FieldDescr::eq(const FieldDescr& other) const {
   return width == other.width &&
     name == other.name &&

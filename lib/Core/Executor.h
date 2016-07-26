@@ -365,9 +365,6 @@ private:
     return state.stack.back().locals[target->dest];
   }
 
-  void induceInvariantsForThisLoop(ExecutionState &state,
-                                   KInstruction *target);
-
   void bindLocal(KInstruction *target, 
                  ExecutionState &state, 
                  ref<Expr> value);
