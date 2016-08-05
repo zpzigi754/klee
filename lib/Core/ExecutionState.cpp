@@ -955,10 +955,10 @@ ExecutionState *LoopInProcess::makeRestartState() {
     const MemoryObject *mo = i->first;
     const BitArray *bytes = i->second;
     if (mo->allocSite) {
-      llvm::errs() <<" Forgetting: [" <<countBitsSet(bytes, mo->size)
-                   <<"/" <<mo->size <<"]" <<*mo->allocSite <<"\n";
+      LOG_LA(" Forgetting: [" <<countBitsSet(bytes, mo->size)
+             <<"/" <<mo->size <<"]" <<*mo->allocSite);
     } else {
-      llvm::errs() <<" Forgetting something.\n";
+      LOG_LA(" Forgetting something.\n");
     }
     const ObjectState *os =
       newState->addressSpace.findObject(mo);
