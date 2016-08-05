@@ -1385,7 +1385,6 @@ void Executor::handleLoopAnalysis(BasicBlock *dst, BasicBlock *src,
                                            &terminate);
   if (terminate) {
     LOG_LA("Terminating state after loop analysis update.");
-    state.doTrace = false;
     terminateState(state);
   }
 }
@@ -2994,8 +2993,9 @@ void Executor::terminateState(ExecutionState &state) {
   }
 
   if (state.loopInProcess.isNull()) {
-    if (state.doTrace)
+    if (state.doTrace) {
       interpreterHandler->processCallPath(state);
+    }
     interpreterHandler->incPathsExplored();
   }
 

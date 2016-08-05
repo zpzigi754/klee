@@ -164,6 +164,19 @@ namespace {
             cl::init(""));
 
   cl::opt<bool>
+  DumpCallTracePrefixes("dump-call-trace-prefixes",
+                        cl::desc("Compute and dump all the prefixes for the call "
+                                 "traces, generated according to klee_trace_*."),
+                        cl::init(false));
+
+  cl::opt<bool>
+  DumpCallTraces("dump-call-traces",
+                 cl::desc("Dump call traces into separate file each. The call "
+                          "traces consist of function invocations with the "
+                          "klee_trace_ret* intrinsic labels."),
+                 cl::init(false));
+
+  cl::opt<bool>
   ReplayKeepSymbolic("replay-keep-symbolic",
                      cl::desc("Replay the test cases only by asserting "
                               "the bytes, not necessarily making them concrete."));
@@ -706,7 +719,12 @@ bool dumpCallInfoSExpr(const CallInfo& ci, llvm::raw_ostream& file) {
 }
 
 void KleeHandler::processCallPath(const ExecutionState &state) {
-  m_callTree.addCallPath(state.callPath.begin(), state.callPath.end());
+
+  if (DumpCallTracePrefixes)
+    m_callTree.addCallPath(state.callPath.begin(), state.callPath.end());
+
+  if (!DumpCallTraces) return;
+
   unsigned id = ++m_callPathIndex;
   std::stringstream filename;
   filename << "call-path" << std::setfill('0') << std::setw(6) << id << '.' << "txt";
@@ -1881,7 +1899,8 @@ int main(int argc, char **argv, char **envp) {
     handler->getInfoStream()
       << "KLEE: saving call prefixes \n";
 
-    handler->dumpCallPathPrefixes();
+    if (DumpCallTracePrefixes)
+      handler->dumpCallPathPrefixes();
 
 
     while (!seeds.empty()) {
