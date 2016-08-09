@@ -630,11 +630,11 @@ inline const char* boolStr(bool x) {return x ? "true" : "false"; }
 
 void dumpFieldsInSExpr(const std::map<int, FieldDescr>& fields,
                        llvm::raw_ostream& file) {
-  file <<"(break_down (\n";
+  file <<"(break_down (";
   std::map<int, FieldDescr>::const_iterator i = fields.begin(),
     e = fields.end();
   for (; i != e; ++i) {
-    file <<"((fname \"" <<i->second.name <<"\") (value ((full "
+    file <<"\n((fname \"" <<i->second.name <<"\") (value ((full "
          <<*i->second.inVal << ")\n";
     dumpFieldsInSExpr(i->second.fields, file);
     file <<")))\n";
@@ -644,7 +644,7 @@ void dumpFieldsInSExpr(const std::map<int, FieldDescr>& fields,
 
 void dumpFieldsOutSExpr(const std::map<int, FieldDescr>& fields,
                         llvm::raw_ostream& file) {
-  file <<"(break_down (\n";
+  file <<"(break_down (";
   std::map<int, FieldDescr>::const_iterator i = fields.begin(),
     e = fields.end();
   for (; i != e; ++i) {
@@ -680,7 +680,7 @@ bool dumpCallArgSExpr(const CallArg *arg, llvm::raw_ostream& file) {
   } else {
     file <<"Nonptr";
   }
-  file <<"))\n";
+  file <<"))";
   return true;
 }
 
@@ -711,7 +711,7 @@ void dumpRetSExpr(const RetVal& ret, llvm::raw_ostream& file) {
 }
 
 bool dumpCallInfoSExpr(const CallInfo& ci, llvm::raw_ostream& file) {
-  file <<"((fun_name \"" <<ci.f->getName() <<"\")\n (args (";
+  file <<"\n((fun_name \"" <<ci.f->getName() <<"\")\n (args (";
   assert(ci.returned);
   for (std::vector< CallArg >::const_iterator argIter = ci.args.begin(),
          end = ci.args.end(); argIter != end; ++argIter) {
@@ -720,16 +720,16 @@ bool dumpCallInfoSExpr(const CallInfo& ci, llvm::raw_ostream& file) {
   }
   file <<"))\n";
   dumpRetSExpr(ci.ret, file);
-  file <<"(call_context (\n";
+  file <<"(call_context (";
   for (std::vector<ref<Expr> >::const_iterator cci = ci.callContext.begin(),
          cce = ci.callContext.end(); cci != cce; ++cci) {
-    file <<**cci<<"\n";
+    file <<"\n" <<**cci;
   }
   file <<"))\n";
-  file <<"(ret_context (\n";
+  file <<"(ret_context (";
   for (std::vector<ref<Expr> >::const_iterator rci = ci.returnContext.begin(),
          rce = ci.returnContext.end(); rci != rce; ++rci) {
-    file <<**rci<<"\n";
+    file <<"\n" <<**rci;
   }
   file <<")))\n";
   return true;
@@ -1064,14 +1064,14 @@ void CallTree::dumpCallPrefixesSExpr(std::list<CallInfo> accumulated_prefix,
     llvm::raw_ostream* file = fileOpener->openNextCallPathPrefixFile();
     std::list<CallInfo>::iterator ai = accumulated_prefix.begin(),
       ae = accumulated_prefix.end();
-    *file <<"((history (\n";
+    *file <<"((history (";
     for (; ai != ae; ++ai) {
       bool dumped = dumpCallInfoSExpr(*ai, *file);
       assert(dumped);
     }
     *file <<"))";
     //FIXME: currently there can not be more than one alternative.
-    *file <<"(tip_calls (\n";
+    *file <<"(tip_calls (";
     for (std::vector<CallInfo*>::const_iterator chi = ti->begin(),
            che = ti->end(); chi != che; ++chi) {
       bool dumped = dumpCallInfoSExpr(**chi, *file);
