@@ -578,15 +578,19 @@ bool dumpCallInfo(const CallInfo& ci, llvm::raw_ostream& file) {
     if (arg->isPtr) {
       file <<"&";
       if (arg->funPtr == NULL) {
-        file <<"[" <<*arg->val;
-        if (arg->outVal.isNull()) return false;
-        file <<"->" <<*arg->outVal <<"]";
-        std::map<int, FieldDescr>::const_iterator i = arg->fields.begin(),
+        if (arg->tracePointee) {
+          file <<"[" <<*arg->val;
+          if (arg->outVal.isNull()) return false;
+          file <<"->" <<*arg->outVal <<"]";
+          std::map<int, FieldDescr>::const_iterator i = arg->fields.begin(),
             e = arg->fields.end();
-        for (; i != e; ++i) {
-          file <<"[" <<i->second.name <<":" <<*i->second.inVal << "->";
-          if (i->second.outVal.isNull()) return false;
-          file <<*i->second.outVal <<"]";
+          for (; i != e; ++i) {
+            file <<"[" <<i->second.name <<":" <<*i->second.inVal << "->";
+            if (i->second.outVal.isNull()) return false;
+            file <<*i->second.outVal <<"]";
+          }
+        } else {
+          file <<"[...]";
         }
       } else {
         file <<arg->funPtr->getName();
@@ -603,11 +607,15 @@ bool dumpCallInfo(const CallInfo& ci, llvm::raw_ostream& file) {
     if (ci.ret.isPtr) {
       file <<"&";
       if (ci.ret.funPtr == NULL) {
-        file <<"[" <<*ci.ret.val <<"]";
-        std::map<int, FieldDescr>::const_iterator i = ci.ret.fields.begin(),
-          e = ci.ret.fields.end();
-        for (; i != e; ++i) {
-          file <<"[" <<i->second.name <<":" <<*i->second.outVal << "]";
+        if (ci.ret.tracePointee) {
+          file <<"[" <<*ci.ret.val <<"]";
+          std::map<int, FieldDescr>::const_iterator i = ci.ret.fields.begin(),
+            e = ci.ret.fields.end();
+          for (; i != e; ++i) {
+            file <<"[" <<i->second.name <<":" <<*i->second.outVal << "]";
+          }
+        } else {
+          file <<"[...]";
         }
       } else {
         file <<ci.ret.funPtr->getName();
@@ -634,48 +642,76 @@ void dumpFieldsInSExpr(const std::map<int, FieldDescr>& fields,
   file <<"))";
 }
 
- void dumpFieldsOutSExpr(const std::map<int, FieldDescr>& fields,
-                         llvm::raw_ostream& file) {
-   file <<"(break_down (\n";
-   std::map<int, FieldDescr>::const_iterator i = fields.begin(),
-     e = fields.end();
-   for (; i != e; ++i) {
-     file <<"((fname \"" <<i->second.name <<"\") (value ((full "
-          <<*i->second.outVal << ")\n";
-     dumpFieldsOutSExpr(i->second.fields, file);
-     file <<")))\n";
-   }
-   file <<"))";
- }
+void dumpFieldsOutSExpr(const std::map<int, FieldDescr>& fields,
+                        llvm::raw_ostream& file) {
+  file <<"(break_down (\n";
+  std::map<int, FieldDescr>::const_iterator i = fields.begin(),
+    e = fields.end();
+  for (; i != e; ++i) {
+    file <<"\n((fname \"" <<i->second.name <<"\") (value ((full "
+         <<*i->second.outVal << ")\n";
+    dumpFieldsOutSExpr(i->second.fields, file);
+    file <<")))";
+  }
+  file <<"))";
+}
 
 bool dumpCallArgSExpr(const CallArg *arg, llvm::raw_ostream& file) {
-  file <<"((aname \"" <<arg->name <<"\")\n";
-  file <<"(value ((full " <<*arg->expr <<") (break_down ())))\n";
-  file <<"(is_ptr " <<boolStr(arg->isPtr) <<")\n";
-  file <<"(pointee (\n";
+  file <<"\n((aname \"" <<arg->name <<"\")\n";
+  file <<"(value " <<*arg->expr <<")\n";
+  file <<"(ptr ";
   if (arg->isPtr) {
-    file <<"((is_fun_ptr " <<boolStr(arg->funPtr != NULL) <<")\n";
     if (arg->funPtr == NULL) {
-      file <<"(fun_name ())\n";
-      file <<"(before (((full "<<*arg->val <<")\n";
-      dumpFieldsInSExpr(arg->fields, file);
-      file <<")))\n";
-      if (arg->outVal.isNull()) return false;
-      file <<"(after (((full " <<*arg->outVal <<")\n";
-      dumpFieldsOutSExpr(arg->fields, file);
-      file <<")))\n";
+      if (arg->tracePointee) {
+        file <<"(Curioptr\n";
+        file <<"(before (((full "<<*arg->val <<")\n";
+        dumpFieldsInSExpr(arg->fields, file);
+        file <<")))\n";
+        if (arg->outVal.isNull()) return false;
+        file <<"(after ((full " <<*arg->outVal <<")\n";
+        dumpFieldsOutSExpr(arg->fields, file);
+        file <<")))\n";
+      } else {
+        file <<"Apathptr";
+      }
     } else {
-      file <<"(before ()) (after ()) ";
-      file <<"(fun_name (\"" <<arg->funPtr->getName() <<"\"))\n";
+      file <<"(Funptr \"" <<arg->funPtr->getName() <<"\")";
     }
-    file <<")\n";
+  } else {
+    file <<"Nonptr";
   }
-  file <<")))\n";
+  file <<"))\n";
   return true;
 }
 
+void dumpRetSExpr(const RetVal& ret, llvm::raw_ostream& file) {
+  if (ret.expr.isNull()) {
+    file <<"(ret ())";
+  } else {
+    file <<"(ret (((value " <<*ret.expr <<"))\n";
+    file <<"(ptr ";
+    if (ret.isPtr) {
+      if (ret.funPtr == NULL) {
+        if (ret.tracePointee) {
+          file <<"(Curioptr ((before ())) (after ((full "
+               <<*ret.val <<")";
+          dumpFieldsOutSExpr(ret.fields, file);
+          file <<")))\n";
+        } else {
+          file <<"Apathptr";
+        }
+      } else {
+        file <<"(Funptr \"" <<ret.funPtr->getName() <<"\")";
+      }
+    } else {
+      file <<"Nonptr";
+    }
+    file <<")))";
+  }
+}
+
 bool dumpCallInfoSExpr(const CallInfo& ci, llvm::raw_ostream& file) {
-  file <<"((fun_name \"" <<ci.f->getName() <<"\")\n (args (\n";
+  file <<"((fun_name \"" <<ci.f->getName() <<"\")\n (args (";
   assert(ci.returned);
   for (std::vector< CallArg >::const_iterator argIter = ci.args.begin(),
          end = ci.args.end(); argIter != end; ++argIter) {
@@ -683,26 +719,7 @@ bool dumpCallInfoSExpr(const CallInfo& ci, llvm::raw_ostream& file) {
     if (!dumpCallArgSExpr(arg, file)) return false;
   }
   file <<"))\n";
-  if (ci.ret.expr.isNull()) {
-    file <<"(ret ())";
-  } else {
-    file <<"(ret (((value ((full " <<*ci.ret.expr <<") (break_down ())))\n";
-    file <<"(is_ptr " << boolStr(ci.ret.isPtr) <<")\n";
-    file <<"(pointee (\n";
-    if (ci.ret.isPtr) {
-      file <<"(is_fun_ptr " <<boolStr(ci.ret.funPtr) <<")\n";
-      if (ci.ret.funPtr == NULL) {
-        file <<"((before ()) ";
-        file <<"(after (value (((full " <<*ci.ret.val <<")\n";
-        dumpFieldsOutSExpr(ci.ret.fields, file);
-        file <<"))))\n";
-      } else {
-        file <<"((before ()) (after ())";
-        file <<"(fun_name (\"" <<ci.ret.funPtr->getName()<<"\")))\n";
-      }
-    }
-    file <<")))))\n";
-  }
+  dumpRetSExpr(ci.ret, file);
   file <<"(call_context (\n";
   for (std::vector<ref<Expr> >::const_iterator cci = ci.callContext.begin(),
          cce = ci.callContext.end(); cci != cce; ++cci) {

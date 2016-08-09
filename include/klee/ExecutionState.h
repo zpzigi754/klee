@@ -88,6 +88,7 @@ struct CallArg {
   ref<Expr> expr;
   ref<Expr> val;
   bool isPtr;
+  bool tracePointee;
   ref<Expr> outVal;
   Expr::Width outWidth;
   llvm::Function* funPtr;
@@ -101,6 +102,7 @@ struct CallArg {
 struct RetVal {
   ref<Expr> expr;
   bool isPtr;
+  bool tracePointee;
   Expr::Width width;
   ref<Expr> val;
   llvm::Function* funPtr;
@@ -313,11 +315,13 @@ public:
                             Expr::Width width) const;
   void traceArgValue(ref<Expr> val, std::string name);
   void traceArgPtr(ref<Expr> arg, Expr::Width width,
-                   std::string name);
+                   std::string name,
+                   bool tracePointee);
   void traceArgFunPtr(ref<Expr> arg,
                       std::string name);
   void traceRet();
-  void traceRetPtr(Expr::Width width);
+  void traceRetPtr(Expr::Width width,
+                   bool tracePointee);
   void traceArgPtrField(ref<Expr> arg, int offset,
                         Expr::Width width, std::string name);
   void traceArgPtrNestedField(ref<Expr> arg, int base_offset, int offset,
