@@ -441,6 +441,7 @@ ref<Expr> ExecutionState::readMemoryChunk(ref<Expr> addr,
   const ObjectState *os = op.second;
   //FIXME: assume inbounds.
   ref<Expr> offset = mo->getOffsetExpr(address);
+  assert(0 < width && "Can not read a zero-length value.");
   return os->read(offset, width);
 }
 
@@ -455,11 +456,13 @@ void ExecutionState::traceRet() {
   }
 }
 
-void ExecutionState::traceRetPtr(Expr::Width width) {
+void ExecutionState::traceRetPtr(Expr::Width width,
+                                 bool tracePointee) {
   traceRet();
   RetVal *ret = &callPath.back().ret;
   ret->isPtr = true;
   ret->width = width;
+  ret->tracePointee = tracePointee;
 }
 
 void ExecutionState::traceArgValue(ref<Expr> val, std::string name) {
@@ -476,16 +479,20 @@ void ExecutionState::traceArgValue(ref<Expr> val, std::string name) {
 }
 
 void ExecutionState::traceArgPtr(ref<Expr> arg, Expr::Width width,
-                                 std::string name) {
+                                 std::string name,
+                                 bool tracePointee) {
   traceArgValue(arg, name);
   CallArg *argInfo = &callPath.back().args.back();
   argInfo->isPtr = true;
   argInfo->outWidth = width;
   argInfo->funPtr = NULL;
-  argInfo->val = readMemoryChunk(arg, width);
+  argInfo->tracePointee = tracePointee;
   SymbolSet symbols = GetExprSymbols::visit(arg);
-  SymbolSet indirectSymbols = GetExprSymbols::visit(argInfo->val);
-  symbols.insert(indirectSymbols.begin(), indirectSymbols.end());
+  if (tracePointee) {
+    argInfo->val = readMemoryChunk(arg, width);
+    SymbolSet indirectSymbols = GetExprSymbols::visit(argInfo->val);
+    symbols.insert(indirectSymbols.begin(), indirectSymbols.end());
+  }
   std::vector<ref<Expr> > constrs = relevantConstraints(symbols);
   callPath.back().callContext.insert(callPath.back().callContext.end(),
                               constrs.begin(), constrs.end());
@@ -511,6 +518,8 @@ void ExecutionState::traceArgPtrField(ref<Expr> arg,
   assert(argInfo != 0 &&
          "Must first trace the pointer arg to trace a particular field.");
   assert(argInfo->outWidth > 0 && "Cannot fit a field into zero bytes.");
+  assert(argInfo->tracePointee && "Must trace the whole pointee to trace"
+         " a single field.");
   assert(argInfo->fields.count(offset) == 0 && "Conflicting field.");
   FieldDescr descr;
   descr.width = width;
@@ -533,6 +542,8 @@ void ExecutionState::traceArgPtrNestedField(ref<Expr> arg,
   assert(argInfo != 0 &&
          "Must first trace the pointer arg to trace a particular field.");
   assert(argInfo->outWidth > 0 && "Cannot fit a field into zero bytes.");
+  assert(argInfo->tracePointee && "Must trace the whole pointee to trace"
+         " a single field.");
   assert(argInfo->fields.count(base_offset) != 0 &&
          "Must first trace the field itself.");
   assert(argInfo->fields[base_offset].fields.count(offset) == 0 &&
@@ -555,6 +566,8 @@ void ExecutionState::traceRetPtrField(int offset,
   RetVal *ret = &callPath.back().ret;
   assert(ret->isPtr && "Only a pointer can have fields traced.");
   assert(ret->width > 0 && "Cannot fit a field in zero sized mem chunk.");
+  assert(ret->tracePointee && "Must trace the whole pointee to trace"
+         " a single field.");
   assert(ret->fields.count(offset) == 0 && "Fields conflict");
   FieldDescr descr;
   descr.width = width;
@@ -572,6 +585,8 @@ void ExecutionState::traceRetPtrNestedField(int base_offset,
   RetVal *ret = &callPath.back().ret;
   assert(ret->isPtr && "Only a pointer can have fields traced.");
   assert(ret->width > 0 && "Cannot fit a field in zero sized mem chunk.");
+  assert(ret->tracePointee && "Must trace the whole pointee to trace"
+         " a single field.");
   assert(ret->fields.count(base_offset) != 0 &&
          "Must first trace the base field.");
   assert(ret->fields[base_offset].fields.count(offset) == 0 && "Fields conflict");
@@ -781,50 +796,109 @@ bool FieldDescr::eq(const FieldDescr& other) const {
 
 bool CallArg::eq(const CallArg& other) const {
   if (fields.size() != other.fields.size()) return false;
+  if (expr.isNull()) {
+    if (!other.expr.isNull()) return false;
+  } else {
+    if (other.expr.isNull()) return false;
+    if (0 != expr->compare(*other.expr)) return false;
+  }
+  if (isPtr) {
+    if (!other.isPtr) return false;
+    if (tracePointee) {
+      if (!other.tracePointee) return false;
+      if (val.isNull()) {
+        if (!other.val.isNull()) return false;
+      } else {
+        if (other.val.isNull()) return false;
+        if (0 != val->compare(*other.val)) return false;
+      }
+      if (outVal.isNull()) {
+        if (!other.outVal.isNull()) return false;
+      } else {
+        if (other.outVal.isNull()) return false;
+        if (0 != outVal->compare(*other.outVal)) return false;
+      }
+      if (outWidth != other.outWidth) return false;
+      if (funPtr != other.funPtr) return false;
+      if (name != other.name) return false;
+    } else {
+      if (other.tracePointee) return false;
+    }
+  } else {
+    if (other.isPtr) return false;
+  }
   std::map<int, FieldDescr>::const_iterator i = fields.begin(),
     e = fields.end();
   for (; i != e; ++i) {
     std::map<int, FieldDescr>::const_iterator it = other.fields.find(i->first);
     if (it == other.fields.end() || !it->second.eq(i->second)) return false;
   }
-  return (expr.isNull() ? other.expr.isNull() :
-          (!other.expr.isNull()) && 0 == expr->compare(*other.expr)) &&
-    (val.isNull() ? other.val.isNull() :
-     (!other.val.isNull()) && 0 == val->compare(*other.val)) &&
-    isPtr == other.isPtr &&
-    (outVal.isNull() ? other.outVal.isNull() :
-     (!other.outVal.isNull()) && 0 == outVal->compare(*other.outVal)) &&
-    outWidth == other.outWidth &&
-    funPtr == other.funPtr &&
-    name == other.name;
+  return true;
 }
 
+// Essentially same as eq, but doe not compare the output states.
 bool CallArg::sameInvocationValue(const CallArg& other) const {
-  return (expr.isNull() ? other.expr.isNull() :
-          (!other.expr.isNull()) && 0 == expr->compare(*other.expr)) &&
-    name == other.name &&
-    (isPtr ?
-     (other.isPtr &&
-      (val.isNull() ? other.val.isNull() && funPtr == other.funPtr :
-       (!other.val.isNull() && 0 == val->compare(*other.val)))) :
-     !other.isPtr);
+  if (expr.isNull()) {
+    if (!other.expr.isNull()) return false;
+  } else {
+    if (other.expr.isNull()) return false;
+    if (0 != expr->compare(*other.expr)) return false;
+  }
+  if (isPtr) {
+    if (!other.isPtr) return false;
+    if (tracePointee) {
+      if (!other.tracePointee) return false;
+      if (val.isNull()) {
+        if (!other.val.isNull()) return false;
+      } else {
+        if (other.val.isNull()) return false;
+        if (0 != val->compare(*other.val)) return false;
+      }
+      if (outWidth != other.outWidth) return false;
+      if (funPtr != other.funPtr) return false;
+      if (name != other.name) return false;
+    } else {
+      if (other.tracePointee) return false;
+    }
+  } else {
+    if (other.isPtr) return false;
+  }
+  return true;
 }
 
 bool RetVal::eq(const RetVal& other) const {
   if (fields.size() != other.fields.size()) return false;
+  if (expr.isNull()) {
+    if (!other.expr.isNull()) return false;
+  } else {
+    if (other.expr.isNull()) return false;
+    if (0 != expr->compare(*other.expr)) return false;
+  }
+  if (isPtr) {
+    if (!other.isPtr) return false;
+    if (tracePointee) {
+      if (!other.tracePointee) return false;
+      if (val.isNull()) {
+        if (!other.val.isNull()) return false;
+      } else {
+        if (other.val.isNull()) return false;
+        if (0 != val->compare(*other.val)) return false;
+      }
+      if (width != width) return false;
+      if (funPtr != other.funPtr) return false;
+    } else {
+      if (other.tracePointee) return false;
+    }
+  } else {
+    if (other.isPtr) return false;
+  }
   std::map<int, FieldDescr>::const_iterator i = fields.begin(),
     e = fields.end();
   for (; i != e; ++i) {
     std::map<int, FieldDescr>::const_iterator it = other.fields.find(i->first);
     if (it == other.fields.end() || !it->second.eq(i->second)) return false;
   }
-  return (expr.isNull() ? other.expr.isNull() :
-          (!other.expr.isNull()) && 0 == expr->compare(*other.expr)) &&
-    isPtr == other.isPtr &&
-    width == other.width &&
-    (val.isNull() ? other.val.isNull() :
-     (!other.val.isNull()) && 0 == val->compare(*other.val)) &&
-    funPtr == other.funPtr;
+  return true;
 }
 
 CallArg* CallInfo::getCallArgPtrp(ref<Expr> ptr) {
@@ -889,7 +963,7 @@ SymbolSet CallInfo::computeInvocationSymbolSet() const {
   for (unsigned i = 0; i < args.size(); ++i) {
     SymbolSet argSymbols = GetExprSymbols::visit(args[i].expr);
     symbols.insert(argSymbols.begin(), argSymbols.end());
-    if (args[i].isPtr && args[i].funPtr == NULL) {
+    if (args[i].isPtr && args[i].funPtr == NULL && args[i].tracePointee) {
       argSymbols = GetExprSymbols::visit(args[i].val);
       symbols.insert(argSymbols.begin(), argSymbols.end());
     }
@@ -903,12 +977,12 @@ SymbolSet CallInfo::computeRetSymbolSet() const {
   if (!ret.expr.isNull()) {
     symbols = GetExprSymbols::visit(ret.expr);
   }
-  if (ret.isPtr && ret.funPtr != NULL) {
+  if (ret.isPtr && ret.funPtr != NULL && ret.tracePointee) {
     SymbolSet ptrSymbols = GetExprSymbols::visit(ret.val);
     symbols.insert(ptrSymbols.begin(), ptrSymbols.end());
   }
   for (unsigned i = 0; i < args.size(); ++i) {
-    if (args[i].isPtr && args[i].funPtr == NULL) {
+    if (args[i].isPtr && args[i].funPtr == NULL && args[i].tracePointee) {
       SymbolSet argSymbols = GetExprSymbols::visit(args[i].outVal);
       symbols.insert(argSymbols.begin(), argSymbols.end());
     }

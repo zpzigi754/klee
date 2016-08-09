@@ -176,9 +176,11 @@ extern "C" {
   KLEE_TRACE_PARAM_PROTO(_i64, int64_t);
 #undef KLEE_TRACE_PARAM_PROTO
   void klee_trace_param_ptr(void* ptr, int width, const char* name);
+  void klee_trace_param_just_ptr(void* ptr, int width, const char* name);
   void klee_trace_param_fptr(void* ptr, const char* name);
   void klee_trace_ret();
   void klee_trace_ret_ptr(int width);
+  void klee_trace_ret_just_ptr(int width);
 
   void klee_trace_param_ptr_field(void* ptr, int offset, int width, char* name);
   void klee_trace_ret_ptr_field(int offset, int width, char* name);
