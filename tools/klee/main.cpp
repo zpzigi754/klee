@@ -689,13 +689,13 @@ bool dumpCallArgSExpr(const CallArg *arg, llvm::raw_ostream& file) {
     if (arg->funPtr == NULL) {
       if (arg->tracePointee) {
         file <<"(Curioptr\n";
-        file <<"(before (((full "<<*arg->val <<")\n";
+        file <<"((before (((full "<<*arg->val <<")\n";
         dumpFieldsInSExpr(arg->fields, file);
         file <<")))\n";
         if (arg->outVal.isNull()) return false;
         file <<"(after ((full " <<*arg->outVal <<")\n";
         dumpFieldsOutSExpr(arg->fields, file);
-        file <<")))\n";
+        file <<"))))\n";
       } else {
         file <<"Apathptr";
       }
@@ -713,15 +713,15 @@ void dumpRetSExpr(const RetVal& ret, llvm::raw_ostream& file) {
   if (ret.expr.isNull()) {
     file <<"(ret ())";
   } else {
-    file <<"(ret (((value " <<*ret.expr <<"))\n";
+    file <<"(ret (((value " <<*ret.expr <<")\n";
     file <<"(ptr ";
     if (ret.isPtr) {
       if (ret.funPtr == NULL) {
         if (ret.tracePointee) {
-          file <<"(Curioptr ((before ())) (after ((full "
+          file <<"(Curioptr ((before ()) (after ((full "
                <<*ret.val <<")";
           dumpFieldsOutSExpr(ret.fields, file);
-          file <<")))\n";
+          file <<"))))\n";
         } else {
           file <<"Apathptr";
         }
@@ -731,7 +731,7 @@ void dumpRetSExpr(const RetVal& ret, llvm::raw_ostream& file) {
     } else {
       file <<"Nonptr";
     }
-    file <<")))";
+    file <<"))))\n";
   }
 }
 
@@ -1098,7 +1098,7 @@ void CallTree::dumpCallPrefixesSExpr(std::list<CallInfo> accumulated_prefix,
       bool dumped = dumpCallInfoSExpr(*ai, *file);
       assert(dumped);
     }
-    *file <<"))";
+    *file <<"))\n";
     //FIXME: currently there can not be more than one alternative.
     *file <<"(tip_calls (";
     for (std::vector<CallInfo*>::const_iterator chi = ti->begin(),
