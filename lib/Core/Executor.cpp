@@ -1505,7 +1505,7 @@ void klee::FillCallInfoOutput(Function* f,
   if (!isVoidReturn) {
     info->ret.expr = result;
     info->ret.isPtr = retType->isPointerTy();
-    if (info->ret.isPtr) {
+    if (info->ret.isPtr && info->ret.tracePointee) {
       llvm::Type *elementType = (cast<PointerType>(retType))->
         getElementType();
       assert(isa<klee::ConstantExpr>(result) &&
