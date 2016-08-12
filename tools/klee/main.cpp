@@ -651,8 +651,6 @@ bool dumpCallInfo(const CallInfo& ci, llvm::raw_ostream& file) {
   return true;
 }
 
-inline const char* boolStr(bool x) {return x ? "true" : "false"; }
-
 void dumpFieldsInSExpr(const std::map<int, FieldDescr>& fields,
                        llvm::raw_ostream& file) {
   file <<"(break_down (";

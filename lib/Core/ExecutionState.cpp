@@ -970,7 +970,7 @@ SymbolSet CallInfo::computeRetSymbolSet() const {
   if (!ret.expr.isNull()) {
     symbols = GetExprSymbols::visit(ret.expr);
   }
-  if (ret.isPtr && ret.funPtr != NULL && ret.tracePointee) {
+  if (ret.isPtr && ret.funPtr == NULL && ret.tracePointee) {
     SymbolSet ptrSymbols = GetExprSymbols::visit(ret.val);
     symbols.insert(ptrSymbols.begin(), ptrSymbols.end());
   }
