@@ -78,6 +78,7 @@ struct FieldDescr {
   Expr::Width width;
   std::string name;
   size_t addr;
+  bool doTraceValue;
   ref<Expr> inVal;
   ref<Expr> outVal;
   std::map<int, FieldDescr> fields;
@@ -327,7 +328,8 @@ public:
                         Expr::Width width, std::string name);
   void traceArgPtrNestedField(ref<Expr> arg, int base_offset, int offset,
                               Expr::Width width, std::string name);
-  void traceRetPtrField(int offset, Expr::Width width, std::string name);
+  void traceRetPtrField(int offset, Expr::Width width, std::string name,
+                        bool doTraceValue);
   void traceRetPtrNestedField(int base_offset, int offset,
                               Expr::Width width, std::string name);
 
