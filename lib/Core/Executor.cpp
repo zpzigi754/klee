@@ -1479,7 +1479,7 @@ static inline const llvm::fltSemantics * fpWidthToSemantics(unsigned width) {
 }
 
 void dumpFields(std::map<int, klee::FieldDescr>* fields, size_t base,
-                      const klee::ExecutionState& state) {
+                const klee::ExecutionState& state) {
   std::map<int, klee::FieldDescr>::iterator i = fields->begin(),
     e = fields->end();
   for (; i != e; ++i) {
@@ -1488,6 +1488,11 @@ void dumpFields(std::map<int, klee::FieldDescr>* fields, size_t base,
       klee::ConstantExpr::alloc(base + offset,
                                 sizeof(size_t)*8);
     i->second.outVal = state.readMemoryChunk(addrExpr, i->second.width);
+    if (i->second.addr == 0)
+      i->second.addr = base + offset;
+    else
+      assert(i->second.addr == base + offset &&
+             "field address can not change during the execution.");
     dumpFields(&i->second.fields, base + offset, state);
   }
 }
