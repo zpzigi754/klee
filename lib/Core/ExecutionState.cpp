@@ -521,6 +521,7 @@ void ExecutionState::traceArgPtrField(ref<Expr> arg,
   ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + offset, sizeof(size_t)*8);
   descr.inVal = readMemoryChunk(addrExpr, width);
   descr.addr = base + offset;
+  descr.doTraceValue = true;
   argInfo->fields[offset] = descr;
 }
 
@@ -548,13 +549,15 @@ void ExecutionState::traceArgPtrNestedField(ref<Expr> arg,
   size_t base = (cast<ConstantExpr>(arg))->getZExtValue();
   ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + base_offset + offset, sizeof(size_t)*8);
   descr.inVal = readMemoryChunk(addrExpr, width);
-  descr.addr = base + offset;
+  descr.addr = base + base_offset + offset;
+  descr.doTraceValue = true;
   argInfo->fields[base_offset].fields[offset] = descr;
 }
 
 void ExecutionState::traceRetPtrField(int offset,
                                       Expr::Width width,
-                                      std::string name) {
+                                      std::string name,
+                                      bool doTraceValue) {
   assert(!callPath.empty() &&
          callPath.back().f == stack.back().kf->function &&
          "Must trace the function first to trace a particular field.");
@@ -568,6 +571,7 @@ void ExecutionState::traceRetPtrField(int offset,
   descr.width = width;
   descr.name = name;
   descr.addr = 0;
+  descr.doTraceValue = doTraceValue;
   ret->fields[offset] = descr;
 }
 
@@ -590,6 +594,7 @@ void ExecutionState::traceRetPtrNestedField(int base_offset,
   descr.width = width;
   descr.name = name;
   descr.addr = 0;
+  descr.doTraceValue = true;
   ret->fields[base_offset].fields[offset] = descr;
 }
 

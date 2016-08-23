@@ -610,9 +610,14 @@ bool dumpCallInfo(const CallInfo& ci, llvm::raw_ostream& file) {
           std::map<int, FieldDescr>::const_iterator i = arg->fields.begin(),
             e = arg->fields.end();
           for (; i != e; ++i) {
-            file <<"[" <<i->second.name <<":" <<*i->second.inVal << "->";
-            if (i->second.outVal.isNull()) return false;
-            file <<*i->second.outVal <<"]";
+            file <<"[" <<i->second.name <<":";
+            if (i->second.doTraceValue) {
+              file <<*i->second.inVal << "->";
+              if (i->second.outVal.isNull()) return false;
+              file <<*i->second.outVal <<"]";
+            } else {
+              file <<"(...)]";
+            }
           }
         } else {
           file <<"[...]";
@@ -637,7 +642,12 @@ bool dumpCallInfo(const CallInfo& ci, llvm::raw_ostream& file) {
           std::map<int, FieldDescr>::const_iterator i = ci.ret.fields.begin(),
             e = ci.ret.fields.end();
           for (; i != e; ++i) {
-            file <<"[" <<i->second.name <<":" <<*i->second.outVal << "]";
+            file <<"[" <<i->second.name <<":";
+            if (i->second.doTraceValue) {
+              file <<*i->second.outVal << "]";
+            } else {
+              file <<"(...)]";
+            }
           }
         } else {
           file <<"[...]";
@@ -657,8 +667,11 @@ void dumpFieldsInSExpr(const std::map<int, FieldDescr>& fields,
   std::map<int, FieldDescr>::const_iterator i = fields.begin(),
     e = fields.end();
   for (; i != e; ++i) {
-    file <<"\n((fname \"" <<i->second.name <<"\") (value ((full "
-         <<*i->second.inVal << ")\n";
+    file <<"\n((fname \"" <<i->second.name <<"\") (value ((full (";
+    if (i->second.doTraceValue) {
+      file <<*i->second.inVal;
+    }
+    file << "))\n";
     dumpFieldsInSExpr(i->second.fields, file);
     file <<") (addr " <<i->second.addr <<")))\n";
   }
@@ -671,10 +684,13 @@ void dumpFieldsOutSExpr(const std::map<int, FieldDescr>& fields,
   std::map<int, FieldDescr>::const_iterator i = fields.begin(),
     e = fields.end();
   for (; i != e; ++i) {
-    file <<"\n((fname \"" <<i->second.name <<"\") (value ((full "
-         <<*i->second.outVal << ")\n";
+    file <<"\n((fname \"" <<i->second.name <<"\") (value ((full (";
+    if (i->second.doTraceValue) {
+      file <<*i->second.outVal;
+    }
+    file << "))\n";
     dumpFieldsOutSExpr(i->second.fields, file);
-    file <<")))";
+    file <<") (addr " <<i->second.addr <<" )))";
   }
   file <<"))";
 }
@@ -716,7 +732,7 @@ void dumpRetSExpr(const RetVal& ret, llvm::raw_ostream& file) {
     if (ret.isPtr) {
       if (ret.funPtr == NULL) {
         if (ret.tracePointee) {
-          file <<"(Curioptr ((before ()) (after ((full "
+          file <<"(Curioptr ((before (((full ()) (breakdown ())))) (after ((full "
                <<*ret.val <<")";
           dumpFieldsOutSExpr(ret.fields, file);
           file <<"))))\n";
@@ -1247,6 +1263,7 @@ static const char *modelledExternals[] = {
   "klee_trace_param_ptr",
   "klee_trace_param_just_ptr",
   "klee_trace_param_ptr_field",
+  "klee_trace_param_ptr_field_just_ptr",
   "klee_trace_param_ptr_nested_field",
   "klee_trace_ret",
   "klee_induce_invariants",
