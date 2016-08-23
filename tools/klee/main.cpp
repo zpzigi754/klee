@@ -660,7 +660,7 @@ void dumpFieldsInSExpr(const std::map<int, FieldDescr>& fields,
     file <<"\n((fname \"" <<i->second.name <<"\") (value ((full "
          <<*i->second.inVal << ")\n";
     dumpFieldsInSExpr(i->second.fields, file);
-    file <<")))\n";
+    file <<") (addr " <<i->second.addr <<")))\n";
   }
   file <<"))";
 }
@@ -1245,9 +1245,13 @@ static const char *modelledExternals[] = {
   "klee_trace_param_fptr",
   "klee_trace_param_i32",
   "klee_trace_param_ptr",
+  "klee_trace_param_just_ptr",
   "klee_trace_param_ptr_field",
   "klee_trace_param_ptr_nested_field",
   "klee_trace_ret",
+  "klee_induce_invariants",
+  "klee_trace_ret_ptr",
+  "klee_trace_ret_ptr_field",
   "klee_set_forking",
   "klee_silent_exit",
   "klee_warning",

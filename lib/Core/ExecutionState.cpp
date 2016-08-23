@@ -520,6 +520,7 @@ void ExecutionState::traceArgPtrField(ref<Expr> arg,
   size_t base = (cast<ConstantExpr>(arg))->getZExtValue();
   ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + offset, sizeof(size_t)*8);
   descr.inVal = readMemoryChunk(addrExpr, width);
+  descr.addr = base + offset;
   argInfo->fields[offset] = descr;
 }
 
@@ -547,6 +548,7 @@ void ExecutionState::traceArgPtrNestedField(ref<Expr> arg,
   size_t base = (cast<ConstantExpr>(arg))->getZExtValue();
   ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + base_offset + offset, sizeof(size_t)*8);
   descr.inVal = readMemoryChunk(addrExpr, width);
+  descr.addr = base + offset;
   argInfo->fields[base_offset].fields[offset] = descr;
 }
 
@@ -565,6 +567,7 @@ void ExecutionState::traceRetPtrField(int offset,
   FieldDescr descr;
   descr.width = width;
   descr.name = name;
+  descr.addr = 0;
   ret->fields[offset] = descr;
 }
 
@@ -586,6 +589,7 @@ void ExecutionState::traceRetPtrNestedField(int base_offset,
   FieldDescr descr;
   descr.width = width;
   descr.name = name;
+  descr.addr = 0;
   ret->fields[base_offset].fields[offset] = descr;
 }
 
@@ -769,8 +773,7 @@ void ExecutionState::startInvariantSearch() {
   }
 }
 
-void ExecutionState::induceInvariantsForThisLoop(KInstruction *target)
-{
+void ExecutionState::induceInvariantsForThisLoop(KInstruction *target) {
   startInvariantSearch();
 
   //The return value of the intrinsic function call.

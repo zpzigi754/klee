@@ -229,7 +229,7 @@ runAndGetCexForked(::VC vc, STPBuilder *builder, ::VCExpr q,
   fflush(stderr);
   int pid = fork();
   if (pid == -1) {
-    fprintf(stderr, "ERROR: fork failed (for STP)");
+    fprintf(stderr, "ERROR: fork failed (for STP). Reason: %s",strerror(errno));
     if (!IgnoreSolverFailures)
       exit(1);
     return SolverImpl::SOLVER_RUN_STATUS_FORK_FAILED;

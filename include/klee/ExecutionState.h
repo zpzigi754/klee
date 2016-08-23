@@ -76,6 +76,7 @@ struct StackFrame {
 struct FieldDescr {
   Expr::Width width;
   std::string name;
+  size_t addr;
   ref<Expr> inVal;
   ref<Expr> outVal;
   std::map<int, FieldDescr> fields;
