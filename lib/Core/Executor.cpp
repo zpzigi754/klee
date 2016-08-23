@@ -1487,12 +1487,14 @@ void dumpFields(std::map<int, klee::FieldDescr>* fields, size_t base,
     ref<klee::ConstantExpr> addrExpr =
       klee::ConstantExpr::alloc(base + offset,
                                 sizeof(size_t)*8);
-    i->second.outVal = state.readMemoryChunk(addrExpr, i->second.width);
+    if (i->second.doTraceValue)
+      i->second.outVal = state.readMemoryChunk(addrExpr, i->second.width);
     if (i->second.addr == 0)
       i->second.addr = base + offset;
-    else
+    else {
       assert(i->second.addr == base + offset &&
              "field address can not change during the execution.");
+    }
     dumpFields(&i->second.fields, base + offset, state);
   }
 }
