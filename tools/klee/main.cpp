@@ -648,7 +648,7 @@ void dumpFieldsInSExpr(const std::map<int, FieldDescr>& fields,
     }
     file << "))\n";
     dumpFieldsInSExpr(i->second.fields, file);
-    file <<") (addr " <<i->second.addr <<")))\n";
+    file <<")) (addr " <<i->second.addr <<"))\n";
   }
   file <<"))";
 }
@@ -707,8 +707,8 @@ void dumpRetSExpr(const RetVal& ret, llvm::raw_ostream& file) {
     if (ret.isPtr) {
       if (ret.funPtr == NULL) {
         if (ret.tracePointee) {
-          file <<"(Curioptr ((before (((full ()) (breakdown ())))) (after ((full "
-               <<*ret.val <<")";
+          file <<"(Curioptr ((before ((full ()) (break_down ()))) (after ((full ("
+               <<*ret.val <<")) ";
           dumpFieldsOutSExpr(ret.fields, file);
           file <<"))))\n";
         } else {
