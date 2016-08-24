@@ -690,7 +690,7 @@ void dumpFieldsOutSExpr(const std::map<int, FieldDescr>& fields,
     }
     file << "))\n";
     dumpFieldsOutSExpr(i->second.fields, file);
-    file <<") (addr " <<i->second.addr <<" )))";
+    file <<")) (addr " <<i->second.addr <<" ))";
   }
   file <<"))";
 }
