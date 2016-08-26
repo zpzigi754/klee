@@ -510,7 +510,8 @@ void ExecutionState::traceArgFunPtr(ref<Expr> arg,
 void ExecutionState::traceArgPtrField(ref<Expr> arg,
                                       int offset,
                                       Expr::Width width,
-                                      std::string name) {
+                                      std::string name,
+                                      bool doTraceValue) {
   assert(!callPath.empty() &&
          callPath.back().f == stack.back().kf->function &&
          "Must trace the function first to trace a particular field.");
@@ -525,10 +526,12 @@ void ExecutionState::traceArgPtrField(ref<Expr> arg,
   descr.width = width;
   descr.name = name;
   size_t base = (cast<ConstantExpr>(arg))->getZExtValue();
-  ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + offset, sizeof(size_t)*8);
-  descr.inVal = readMemoryChunk(addrExpr, width);
+  if (doTraceValue) {
+    ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + offset, sizeof(size_t)*8);
+    descr.inVal = readMemoryChunk(addrExpr, width);
+  }
   descr.addr = base + offset;
-  descr.doTraceValue = true;
+  descr.doTraceValue = doTraceValue;
   argInfo->fields[offset] = descr;
 }
 
