@@ -318,7 +318,8 @@ public:
   void traceRetPtr(Expr::Width width,
                    bool tracePointee);
   void traceArgPtrField(ref<Expr> arg, int offset,
-                        Expr::Width width, std::string name);
+                        Expr::Width width, std::string name,
+                        bool doTraceValue);
   void traceArgPtrNestedField(ref<Expr> arg, int base_offset, int offset,
                               Expr::Width width, std::string name);
   void traceRetPtrField(int offset, Expr::Width width, std::string name,
