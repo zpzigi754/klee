@@ -229,14 +229,20 @@ extern cl::opt<double> MaxTime;
 
 class KleeHandler;
 
+struct CallPathTip {
+  CallInfo call;
+  unsigned path_id;
+};
+
 class CallTree {
   std::vector<CallTree* > children;
-  CallInfo call;
-  std::vector<std::vector<CallInfo*> > groupChildren();
+  CallPathTip tip;
+  std::vector<std::vector<CallPathTip*> > groupChildren();
 public:
-  CallTree():children(), call(){};
+  CallTree():children(), tip(){};
   void addCallPath(std::vector<CallInfo>::const_iterator path_begin,
-                   std::vector<CallInfo>::const_iterator path_end);
+                   std::vector<CallInfo>::const_iterator path_end,
+                   unsigned path_id);
   void dumpCallPrefixes(std::list<CallInfo> accumulated_prefix,
                         std::list<const std::vector<ref<Expr> >* >
                         accumulated_context,
@@ -306,8 +312,8 @@ public:
 
 KleeHandler::KleeHandler(int argc, char **argv)
     : m_interpreter(0), m_pathWriter(0), m_symPathWriter(0), m_infoFile(0),
-      m_outputDirectory(), m_numTotalTests(0), m_numGeneratedTests(0),
-      m_pathsExplored(0), m_callPathIndex(0), m_callPathPrefixIndex(0), m_argc(argc), m_argv(argv) {
+      m_outputDirectory(), m_numTotalTests(0), m_pathsExplored(0), m_numGeneratedTests(0),
+      m_pathsExplored(0), m_callPathIndex(1), m_callPathPrefixIndex(0), m_argc(argc), m_argv(argv) {
 
   // create output directory (OutputDir or "klee-out-<i>")
   bool dir_given = OutputDir != "";
@@ -725,7 +731,7 @@ void dumpRetSExpr(const RetVal& ret, llvm::raw_ostream& file) {
 }
 
 bool dumpCallInfoSExpr(const CallInfo& ci, llvm::raw_ostream& file) {
-  file <<"\n((fun_name \"" <<ci.f->getName() <<"\")\n (args (";
+  file <<"((fun_name \"" <<ci.f->getName() <<"\")\n (args (";
   assert(ci.returned);
   for (std::vector< CallArg >::const_iterator argIter = ci.args.begin(),
          end = ci.args.end(); argIter != end; ++argIter) {
@@ -750,13 +756,16 @@ bool dumpCallInfoSExpr(const CallInfo& ci, llvm::raw_ostream& file) {
 }
 
 void KleeHandler::processCallPath(const ExecutionState &state) {
-
+  unsigned id = m_callPathIndex;
   if (DumpCallTracePrefixes)
-    m_callTree.addCallPath(state.callPath.begin(), state.callPath.end());
+    m_callTree.addCallPath(state.callPath.begin(),
+                           state.callPath.end(),
+                           id);
 
   if (!DumpCallTraces) return;
 
-  unsigned id = ++m_callPathIndex;
+  ++m_callPathIndex;
+
   std::stringstream filename;
   filename << "call-path" << std::setfill('0') << std::setw(6) << id << '.' << "txt";
   llvm::raw_ostream *file = openOutputFile(filename.str());
@@ -868,7 +877,8 @@ std::string KleeHandler::getRunTimeLibraryPath(const char *argv0) {
 }
 
 void CallTree::addCallPath(std::vector<CallInfo>::const_iterator path_begin,
-                           std::vector<CallInfo>::const_iterator path_end) {
+                           std::vector<CallInfo>::const_iterator path_end,
+                           unsigned path_id) {
   //TODO: do we process constraints (what if they are different from the old ones?)
   //TODO: record assumptions for each item in the call-path, because, when
   // comparing two paths in the tree they may differ only by the assumptions.
@@ -876,32 +886,33 @@ void CallTree::addCallPath(std::vector<CallInfo>::const_iterator path_begin,
   std::vector<CallInfo>::const_iterator next = path_begin;
   ++next;
   std::vector<CallTree*>::iterator i = children.begin(), ie = children.end();
-  for (; i!=ie; ++i) {
-    if ((*i)->call.eq(*path_begin)) {
-      (*i)->addCallPath(next, path_end);
+  for (; i != ie; ++i) {
+    if ((*i)->tip.call.eq(*path_begin)) {
+      (*i)->addCallPath(next, path_end, path_id);
       return;
     }
   }
   children.push_back(new CallTree());
   CallTree* n = children.back();
-  n->call = *path_begin;
-  n->addCallPath(next, path_end);
+  n->tip.call = *path_begin;
+  n->tip.path_id = path_id;
+  n->addCallPath(next, path_end, path_id);
 }
 
-std::vector<std::vector<CallInfo*> > CallTree::groupChildren() {
-  std::vector<std::vector<CallInfo*> > ret;
+std::vector<std::vector<CallPathTip*> > CallTree::groupChildren() {
+  std::vector<std::vector<CallPathTip*> > ret;
   for (unsigned ci = 0; ci < children.size(); ++ci) {
-    CallInfo* current = &children[ci]->call;
+    CallPathTip* current = &children[ci]->tip;
     bool groupNotFound = true;
     for (unsigned gi = 0; gi < ret.size(); ++gi) {
-      if (current->sameInvocation(ret[gi][0])) {
+      if (current->call.sameInvocation(&ret[gi][0]->call)) {
         ret[gi].push_back(current);
         groupNotFound = false;
         break;
       }
     }
     if (groupNotFound) {
-      ret.push_back(std::vector<CallInfo*>());
+      ret.push_back(std::vector<CallPathTip*>());
       ret.back().push_back(current);
     }
   }
@@ -1014,8 +1025,8 @@ void CallTree::dumpCallPrefixes(std::list<CallInfo> accumulated_prefix,
                                 std::list<const std::vector<ref<Expr> >* >
                                 accumulated_context,
                                 KleeHandler* fileOpener) {
-  std::vector<std::vector<CallInfo*> > tipCalls = groupChildren();
-  std::vector<std::vector<CallInfo*> >::iterator ti = tipCalls.begin(),
+  std::vector<std::vector<CallPathTip*> > tipCalls = groupChildren();
+  std::vector<std::vector<CallPathTip*> >::iterator ti = tipCalls.begin(),
     te = tipCalls.end();
   for (; ti != te; ++ti) {
     llvm::raw_ostream* file = fileOpener->openNextCallPathPrefixFile();
@@ -1038,17 +1049,19 @@ void CallTree::dumpCallPrefixes(std::list<CallInfo> accumulated_prefix,
     *file <<"--- Alternatives ---\n";
     //FIXME: currently there can not be more than one alternative.
     *file <<"(or \n";
-    for (std::vector<CallInfo*>::const_iterator chi = ti->begin(),
+    for (std::vector<CallPathTip*>::const_iterator chi = ti->begin(),
            che = ti->end(); chi != che; ++chi) {
       *file <<"(and \n";
-      bool dumped = dumpCallInfo(**chi, *file);
+      bool dumped = dumpCallInfo((**chi).call, *file);
       assert(dumped);
-      for (std::vector<ref<Expr> >::const_iterator ei = (**chi).callContext.begin(),
-             ee = (**chi).callContext.end(); ei != ee; ++ei) {
+      for (std::vector<ref<Expr> >::const_iterator ei =
+             (**chi).call.callContext.begin(),
+             ee = (**chi).call.callContext.end(); ei != ee; ++ei) {
         *file <<**ei<<"\n";
       }
-      for (std::vector<ref<Expr> >::const_iterator ei = (**chi).returnContext.begin(),
-             ee = (**chi).returnContext.end(); ei != ee; ++ei) {
+      for (std::vector<ref<Expr> >::const_iterator ei =
+             (**chi).call.returnContext.begin(),
+             ee = (**chi).call.returnContext.end(); ei != ee; ++ei) {
         *file <<**ei<<"\n";
       }
       *file <<"true)\n";
@@ -1059,9 +1072,9 @@ void CallTree::dumpCallPrefixes(std::list<CallInfo> accumulated_prefix,
   std::vector< CallTree* >::iterator ci = children.begin(),
     ce = children.end();
   for (; ci != ce; ++ci) {
-    accumulated_prefix.push_back(( *ci )->call);
-    accumulated_context.push_back(&(*ci)->call.callContext);
-    accumulated_context.push_back(&(*ci)->call.returnContext);
+    accumulated_prefix.push_back(( *ci )->tip.call);
+    accumulated_context.push_back(&(*ci)->tip.call.callContext);
+    accumulated_context.push_back(&(*ci)->tip.call.returnContext);
     ( *ci )->dumpCallPrefixes(accumulated_prefix, accumulated_context, fileOpener);
     accumulated_context.pop_back();
     accumulated_context.pop_back();
@@ -1071,24 +1084,25 @@ void CallTree::dumpCallPrefixes(std::list<CallInfo> accumulated_prefix,
 
 void CallTree::dumpCallPrefixesSExpr(std::list<CallInfo> accumulated_prefix,
                                      KleeHandler* fileOpener) {
-  std::vector<std::vector<CallInfo*> > tipCalls = groupChildren();
-  std::vector<std::vector<CallInfo*> >::iterator ti = tipCalls.begin(),
+  std::vector<std::vector<CallPathTip*> > tipCalls = groupChildren();
+  std::vector<std::vector<CallPathTip*> >::iterator ti = tipCalls.begin(),
     te = tipCalls.end();
   for (; ti != te; ++ti) {
     llvm::raw_ostream* file = fileOpener->openNextCallPathPrefixFile();
     std::list<CallInfo>::iterator ai = accumulated_prefix.begin(),
       ae = accumulated_prefix.end();
-    *file <<"((history (";
+    *file <<"((history (\n";
     for (; ai != ae; ++ai) {
       bool dumped = dumpCallInfoSExpr(*ai, *file);
       assert(dumped);
     }
     *file <<"))\n";
     //FIXME: currently there can not be more than one alternative.
-    *file <<"(tip_calls (";
-    for (std::vector<CallInfo*>::const_iterator chi = ti->begin(),
+    *file <<"(tip_calls (\n";
+    for (std::vector<CallPathTip*>::const_iterator chi = ti->begin(),
            che = ti->end(); chi != che; ++chi) {
-      bool dumped = dumpCallInfoSExpr(**chi, *file);
+      *file <<"; id: " <<(**chi).path_id <<"\n";
+      bool dumped = dumpCallInfoSExpr((**chi).call, *file);
       assert(dumped);
     }
     *file <<")))\n";
@@ -1097,7 +1111,7 @@ void CallTree::dumpCallPrefixesSExpr(std::list<CallInfo> accumulated_prefix,
   std::vector< CallTree* >::iterator ci = children.begin(),
     ce = children.end();
   for (; ci != ce; ++ci) {
-    accumulated_prefix.push_back(( *ci )->call);
+    accumulated_prefix.push_back(( *ci )->tip.call);
     ( *ci )->dumpCallPrefixesSExpr(accumulated_prefix, fileOpener);
     accumulated_prefix.pop_back();
   }
