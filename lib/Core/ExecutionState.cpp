@@ -420,14 +420,27 @@ bool symbolSetsIntersect(const SymbolSet& a, const SymbolSet& b) {
 std::vector<ref<Expr> > ExecutionState::
 relevantConstraints(SymbolSet symbols) const {
   std::vector<ref<Expr> > ret;
-  for (ConstraintManager::constraint_iterator ci = constraints.begin(),
-         cEnd = constraints.end(); ci != cEnd; ++ci) {
-    SymbolSet constrainedSymbols = GetExprSymbols::visit(*ci);
-    if (symbolSetsIntersect(constrainedSymbols, symbols)) {
-      symbols.insert(constrainedSymbols.begin(), constrainedSymbols.end());
-      ret.push_back(*ci);
+  llvm::SmallPtrSet<Expr*, 100> insertedConstraints;
+  bool newSymbols = false;
+  do {
+    newSymbols = false;
+    for (ConstraintManager::constraint_iterator ci = constraints.begin(),
+           cEnd = constraints.end(); ci != cEnd; ++ci) {
+      if (insertedConstraints.count((*ci).get())) continue;
+      SymbolSet constrainedSymbols = GetExprSymbols::visit(*ci);
+      if (symbolSetsIntersect(constrainedSymbols, symbols)) {
+        for (SymbolSet::const_iterator csi = constrainedSymbols.begin(),
+               cse = constrainedSymbols.end();
+             csi != cse; ++csi) {
+          bool inserted = symbols.insert(*csi);
+          newSymbols = newSymbols || inserted;
+        }
+        symbols.insert(constrainedSymbols.begin(), constrainedSymbols.end());
+        ret.push_back(*ci);
+        insertedConstraints.insert((*ci).get());
+      }
     }
-  }
+  } while (newSymbols);
   return ret;
 }
 
