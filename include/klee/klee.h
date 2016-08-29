@@ -196,6 +196,9 @@ extern "C" {
 
   int klee_induce_invariants();
 
+  void klee_forbid_access(void* ptr, int width, char* message);
+  void klee_allow_access(void* ptr, int width);
+
 #ifdef __cplusplus
 }
 #endif
