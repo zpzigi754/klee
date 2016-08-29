@@ -799,20 +799,27 @@ void SpecialFunctionHandler::handleMakeSymbolic(ExecutionState &state,
 
   Executor::ExactResolutionList rl;
   executor.resolveExact(state, arguments[0], rl, "make_symbolic");
-  
+
   for (Executor::ExactResolutionList::iterator it = rl.begin(), 
          ie = rl.end(); it != ie; ++it) {
     const MemoryObject *mo = it->first.first;
     mo->setName(name);
-    
+
     const ObjectState *old = it->first.second;
     ExecutionState *s = it->second;
-    
+
     if (old->readOnly) {
       executor.terminateStateOnError(*s, "cannot make readonly object symbolic",
                                      Executor::User);
       return;
-    } 
+    }
+    if (!old->accessible) {
+      executor.terminateStateOnError
+        (*s, llvm::Twine("cannot make inaccessible object symbolic") +
+         "the object was rendered inaccessible due to:" +
+         old->inaccessible_message, "user.err");
+      return;
+    }
 
     // FIXME: Type coercion should be done consistently somewhere.
     bool res;

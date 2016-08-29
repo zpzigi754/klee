@@ -172,6 +172,9 @@ public:
 
   bool readOnly;
 
+  bool accessible;
+  llvm::Twine inaccessible_message;
+
 public:
   /// Create a new object state for the given memory object with concrete
   /// contents. The initial contents are undefined, it is the callers
@@ -188,6 +191,10 @@ public:
   const MemoryObject *getObject() const { return object; }
 
   void setReadOnly(bool ro) { readOnly = ro; }
+
+  bool isAccessible() const { return accessible; }
+  void forbidAccess(const llvm::Twine &msg);
+  void allowAccess() { assert(!accessible); accessible = true; }
 
   // make contents all concrete and zero
   void initializeToZero();
