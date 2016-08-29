@@ -130,6 +130,8 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_trace_ret_ptr_nested_field", handleTraceRetPtrNestedField, false),
   add("klee_forget_all", handleForgetAll, false),
   add("klee_induce_invariants", handleInduceInvariants, true),
+  add("klee_forbid_access", handleForbidAccess, false),
+  add("klee_allow_access", handleAllowAccess, false),
 
   // operator delete[](void*)
   add("_ZdaPv", handleDeleteArray, false),
@@ -933,4 +935,25 @@ void SpecialFunctionHandler::handleForgetAll
 void SpecialFunctionHandler::handleInduceInvariants
 (ExecutionState &state, KInstruction *target, std::vector<ref<Expr> > &arguments) {
   state.induceInvariantsForThisLoop(target);
+}
+
+void SpecialFunctionHandler::handleForbidAccess
+(ExecutionState &state, KInstruction *target,
+ std::vector<ref<Expr> > &arguments) {
+  ref<Expr> addr = arguments[0];
+  assert(isa<klee::ConstantExpr>(arguments[1]) && "Width must be a static constant.");
+  Expr::Width width = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
+  width = width * 8;//Convert to bits.
+  std::string message = readStringAtAddress(state, arguments[2]);
+  assert(false && "unsupported klee_forbid_access.");
+}
+
+void SpecialFunctionHandler::handleAllowAccess
+(ExecutionState &state, KInstruction *target,
+ std::vector<ref<Expr> > &arguments) {
+  ref<Expr> addr = arguments[0];
+  assert(isa<klee::ConstantExpr>(arguments[1]) && "Width must be a static constant.");
+  Expr::Width width = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
+  width = width * 8;//Convert to bits.
+  assert(false && "unsupported klee_allow_access.");
 }
