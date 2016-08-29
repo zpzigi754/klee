@@ -357,6 +357,8 @@ bool ExecutionState::merge(const ExecutionState &b) {
     assert(os && !os->readOnly && 
            "objects mutated but not writable in merging state");
     assert(otherOS);
+    assert(os->isAccessible() && otherOS->isAccessible() &&
+           "Merging of inaccessible objects is not supported.");
 
     ObjectState *wos = addressSpace.getWriteable(mo, os);
     for (unsigned i=0; i<mo->size; i++) {
@@ -626,7 +628,7 @@ void ExecutionState::symbolizeConcretes() {
          obj_E = addressSpace.objects.end(); obj_I != obj_E; ++obj_I) {
     const MemoryObject *mo = obj_I->first;
     ObjectState *os = obj_I->second;
-    if (!os->readOnly) {
+    if (!os->readOnly && os->isAccessible()) {
       ObjectState *osw = addressSpace.getWriteable(mo, os);
       osw->forgetAll();
     }

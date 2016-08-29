@@ -38,6 +38,7 @@ const ObjectState *AddressSpace::findObject(const MemoryObject *mo) const {
 ObjectState *AddressSpace::getWriteable(const MemoryObject *mo,
                                         const ObjectState *os) {
   assert(!os->readOnly);
+  assert(os->isAccessible());
 
   if (cowKey==os->copyOnWriteOwner) {
     return const_cast<ObjectState*>(os);
