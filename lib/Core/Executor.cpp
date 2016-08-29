@@ -3477,27 +3477,34 @@ void Executor::executeMemoryOperation(ExecutionState &state,
 
     if (inBounds) {
       const ObjectState *os = op.second;
-      if (isWrite) {
-        if (os->readOnly) {
-          terminateStateOnError(state,
-                                "memory error: object read only",
-                                "readonly.err");
+      if (os->isAccessible()) {
+        if (isWrite) {
+          if (os->readOnly) {
+            terminateStateOnError(state,
+                                  "memory error: object read only",
+                                  "readonly.err");
+          } else {
+            ObjectState *wos = state.addressSpace.getWriteable(mo, os);
+            wos->write(offset, value);
+          }
         } else {
-          ObjectState *wos = state.addressSpace.getWriteable(mo, os);
-          wos->write(offset, value);
-        }          
+          ref<Expr> result = os->read(offset, type);
+
+          if (interpreterOpts.MakeConcreteSymbolic)
+            result = replaceReadWithSymbolic(state, result);
+
+          bindLocal(target, state, result);
+        }
       } else {
-        ref<Expr> result = os->read(offset, type);
-        
-        if (interpreterOpts.MakeConcreteSymbolic)
-          result = replaceReadWithSymbolic(state, result);
-        
-        bindLocal(target, state, result);
+        terminateStateOnError
+          (state, llvm::Twine("memory error: object inaccessible") +
+           "It is rendered inaccessible because: " + os->inaccessible_message,
+           "inaccessible.err");
       }
 
       return;
     }
-  } 
+  }
 
   // we are on an error path (no resolution, multiple resolution, one
   // resolution with out of bounds)
@@ -3521,19 +3528,26 @@ void Executor::executeMemoryOperation(ExecutionState &state,
 
     // bound can be 0 on failure or overlapped 
     if (bound) {
-      if (isWrite) {
-        if (os->readOnly) {
-          terminateStateOnError(*bound,
-                                "memory error: object read only",
-                                "readonly.err");
+      if (os->isAccessible()) {
+        if (isWrite) {
+          if (os->readOnly) {
+            terminateStateOnError(*bound,
+                                  "memory error: object read only",
+                                  "readonly.err");
+          } else {
+            ObjectState *wos = bound->addressSpace.getWriteable(mo, os);
+            wos->write(mo->getOffsetExpr(address), value);
+          }
         } else {
-          ObjectState *wos = bound->addressSpace.getWriteable(mo, os);
-          wos->write(mo->getOffsetExpr(address), value);
+          ref<Expr> result = os->read(mo->getOffsetExpr(address), type);
+          bindLocal(target, *bound, result);
         }
-      } else {
-        ref<Expr> result = os->read(mo->getOffsetExpr(address), type);
-        bindLocal(target, *bound, result);
       }
+    } else {
+      terminateStateOnError
+        (state, llvm::Twine("memory error: object inaccessible") +
+         "It is rendered inaccessible because: " + os->inaccessible_message,
+         "inaccessible.err");
     }
 
     unbound = branches.second;
@@ -3849,6 +3863,7 @@ void Executor::doImpliedValueConcretization(ExecutionState &state,
                                             ref<Expr> e,
                                             ref<ConstantExpr> value) {
   abort(); // FIXME: Broken until we sort out how to do the write back.
+  //FIXME: handle ObjectState::accessible here.
 
   if (DebugCheckForImpliedValues)
     ImpliedValue::checkForImpliedValues(solver->solver, e, value);
