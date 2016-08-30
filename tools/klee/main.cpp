@@ -730,6 +730,20 @@ void dumpRetSExpr(const RetVal& ret, llvm::raw_ostream& file) {
   }
 }
 
+bool dumpExtraPtrSExpr(const CallExtraPtr& cep, llvm::raw_ostream& file) {
+  file <<"\n((pname \"" <<cep.name <<"\")\n";
+  file <<"(value " <<cep.ptr <<")\n";
+  file <<"(ptee ";
+  file <<"((before ((full ("<<*cep.inVal <<"))\n";
+  dumpFieldsInSExpr(cep.fields, file);
+  file <<"))\n";
+  if (cep.outVal.isNull()) return false;
+  file <<"(after ((full (" <<*cep.outVal <<"))\n";
+  dumpFieldsOutSExpr(cep.fields, file);
+  file <<")))))";
+  return true;
+}
+
 bool dumpCallInfoSExpr(const CallInfo& ci, llvm::raw_ostream& file) {
   file <<"((fun_name \"" <<ci.f->getName() <<"\")\n (args (";
   assert(ci.returned);
@@ -737,6 +751,13 @@ bool dumpCallInfoSExpr(const CallInfo& ci, llvm::raw_ostream& file) {
          end = ci.args.end(); argIter != end; ++argIter) {
     const CallArg *arg = &*argIter;
     if (!dumpCallArgSExpr(arg, file)) return false;
+  }
+  file <<"))\n";
+  file <<"(extra_ptrs (";
+  std::map<size_t, CallExtraPtr>::const_iterator i = ci.extraPtrs.begin(),
+    e = ci.extraPtrs.end();
+  for (; i != e; ++i) {
+    dumpExtraPtrSExpr(i->second, file);
   }
   file <<"))\n";
   dumpRetSExpr(ci.ret, file);
