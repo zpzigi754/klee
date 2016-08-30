@@ -201,9 +201,12 @@ public:
   // make contents all concrete and random
   void initializeToRandom();
 
-  ref<Expr> read(ref<Expr> offset, Expr::Width width) const;
-  ref<Expr> read(unsigned offset, Expr::Width width) const;
-  ref<Expr> read8(unsigned offset) const;
+  ref<Expr> read(ref<Expr> offset, Expr::Width width,
+                 bool circumventInaccessibility = false) const;
+  ref<Expr> read(unsigned offset, Expr::Width width,
+                 bool circumventInaccessibility = false) const;
+  ref<Expr> read8(unsigned offset,
+                  bool circumventInaccessibility = false) const;
 
   // return bytes written.
   void write(unsigned offset, ref<Expr> value);
