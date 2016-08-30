@@ -152,7 +152,8 @@ ObjectState::ObjectState(const ObjectState &os)
     updates(os.updates),
     size(os.size),
     readOnly(false),
-    accessible(true) {
+    accessible(os.accessible),
+    inaccessible_message(os.inaccessible_message) {
   assert(!os.readOnly && "no need to copy read only object?");
   if (object)
     object->refCount++;
