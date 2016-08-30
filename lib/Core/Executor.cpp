@@ -3574,10 +3574,11 @@ void Executor::executeMemoryOperation(ExecutionState &state,
           bindLocal(target, state, result);
         }
       } else {
-        terminateStateOnError
-          (state, llvm::Twine("memory error: object inaccessible") +
-           "It is rendered inaccessible because: " + os->inaccessible_message,
-           "inaccessible.err");
+        std::stringstream msg;
+        msg << "memory error: object inaccessible. ";
+        msg << "It is rendered inaccessible because: ";
+        msg << os->inaccessible_message;
+        terminateStateOnError(state, msg.str(), "inaccessible.err");
       }
 
       return;
@@ -3622,10 +3623,11 @@ void Executor::executeMemoryOperation(ExecutionState &state,
         }
       }
     } else {
-      terminateStateOnError
-        (state, llvm::Twine("memory error: object inaccessible") +
-         "It is rendered inaccessible because: " + os->inaccessible_message,
-         "inaccessible.err");
+      std::stringstream msg;
+      msg << "memory error: object inaccessible. ";
+      msg << "It is rendered inaccessible because: ";
+      msg << os->inaccessible_message;
+      terminateStateOnError(state, msg.str(), "inaccessible.err");
     }
 
     unbound = branches.second;
