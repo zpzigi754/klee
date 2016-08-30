@@ -329,7 +329,8 @@ public:
   bool merge(const ExecutionState &b);
   void dumpStack(llvm::raw_ostream &out) const;
   ref<Expr> readMemoryChunk(ref<Expr> addr,
-                            Expr::Width width) const;
+                            Expr::Width width,
+                            bool circumventInaccessibility) const;
   void traceArgValue(ref<Expr> val, std::string name);
   void traceArgPtr(ref<Expr> arg, Expr::Width width,
                    std::string name,
