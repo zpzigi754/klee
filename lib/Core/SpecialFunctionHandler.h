@@ -154,6 +154,7 @@ namespace klee {
     HANDLER(handleTraceRetPtrNestedField);
     HANDLER(handleTraceExtraPtr);
     HANDLER(handleTraceExtraPtrField);
+    HANDLER(handleTraceExtraPtrFieldJustPtr);
     HANDLER(handleForgetAll);
     HANDLER(handleInduceInvariants);
     HANDLER(handleForbidAccess);
