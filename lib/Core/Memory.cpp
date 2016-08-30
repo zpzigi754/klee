@@ -318,7 +318,7 @@ void ObjectState::forgetThese(const BitArray *bytesToForget) {
 void ObjectState::forbidAccess(const llvm::Twine& msg) {
   assert(accessible);
   accessible = false;
-  inaccessible_message = msg;
+  inaccessible_message = msg.str();
 }
 
 void ObjectState::initializeToZero() {
