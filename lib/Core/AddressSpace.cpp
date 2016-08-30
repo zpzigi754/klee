@@ -35,6 +35,21 @@ const ObjectState *AddressSpace::findObject(const MemoryObject *mo) const {
   return res ? res->second : 0;
 }
 
+void AddressSpace::allowAccess(const MemoryObject *mo,
+                               const ObjectState *os) {
+  assert(!os->readOnly);
+  assert(!os->isAccessible());
+
+  if (cowKey==os->copyOnWriteOwner) {
+    const_cast<ObjectState*>(os)->allowAccess();
+  } else {
+    ObjectState *n = new ObjectState(*os);
+    n->copyOnWriteOwner = cowKey;
+    objects = objects.replace(std::make_pair(mo, n));
+    n->allowAccess();
+  }
+}
+
 ObjectState *AddressSpace::getWriteable(const MemoryObject *mo,
                                         const ObjectState *os) {
   assert(!os->readOnly);
@@ -46,7 +61,7 @@ ObjectState *AddressSpace::getWriteable(const MemoryObject *mo,
     ObjectState *n = new ObjectState(*os);
     n->copyOnWriteOwner = cowKey;
     objects = objects.replace(std::make_pair(mo, n));
-    return n;    
+    return n;
   }
 }
 
