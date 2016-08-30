@@ -1283,6 +1283,8 @@ static const char *modelledExternals[] = {
   "klee_induce_invariants",
   "klee_trace_ret_ptr",
   "klee_trace_ret_ptr_field",
+  "klee_forbid_access",
+  "klee_allow_access",
   "klee_set_forking",
   "klee_silent_exit",
   "klee_warning",
