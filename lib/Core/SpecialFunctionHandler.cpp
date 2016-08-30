@@ -132,6 +132,8 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_trace_ret_ptr_field_just_ptr", handleTraceRetPtrFieldJustPtr, false),
   add("klee_trace_param_ptr_nested_field", handleTraceParamPtrNestedField, false),
   add("klee_trace_ret_ptr_nested_field", handleTraceRetPtrNestedField, false),
+  add("klee_trace_extra_ptr", handleTraceExtraPtr, false),
+  add("klee_trace_extra_ptr_field", handleTraceExtraPtrField, false),
   add("klee_forget_all", handleForgetAll, false),
   add("klee_induce_invariants", handleInduceInvariants, true),
   add("klee_forbid_access", handleForbidAccess, false),
@@ -942,6 +944,19 @@ void SpecialFunctionHandler::handleTraceRetPtrNestedField
   state.traceRetPtrNestedField(base_offset, offset, width, name);
 }
 
+void SpecialFunctionHandler::handleTraceExtraPtr(ExecutionState &state,
+                                                 KInstruction *target,
+                                                 std::vector<ref<Expr> >
+                                                 &arguments) {
+  assert(isa<klee::ConstantExpr>(arguments[1]) && "Width must be a static constant.");
+  Expr::Width width = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
+  width = width * 8;//Convert to bits.
+  std::string name = readStringAtAddress(state, arguments[2]);
+  size_t ptr = (cast<ConstantExpr>(arguments[0]))->getZExtValue();
+  state.traceExtraPtr(ptr, width, name, true);
+}
+
+
 void SpecialFunctionHandler::handleTraceParamPtrNestedField
 (ExecutionState &state,
  KInstruction *target,
@@ -963,6 +978,18 @@ void SpecialFunctionHandler::handleTraceParamPtrField(ExecutionState &state,
   std::string name = readStringAtAddress(state, arguments[3]);
   width = width * 8;//Convert to bits.
   state.traceArgPtrField(arguments[0], offset, width, name, true);
+}
+
+void SpecialFunctionHandler::handleTraceExtraPtrField(ExecutionState &state,
+                                                      KInstruction *target,
+                                                      std::vector<ref<Expr> >
+                                                      &arguments) {
+  int offset = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
+  Expr::Width width = (cast<klee::ConstantExpr>(arguments[2]))->getZExtValue();
+  std::string name = readStringAtAddress(state, arguments[3]);
+  width = width * 8;//Convert to bits.
+  size_t ptr = (cast<ConstantExpr>(arguments[0]))->getZExtValue();
+  state.traceExtraPtrField(ptr, offset, width, name, true);
 }
 
 void SpecialFunctionHandler::handleTraceParamPtrFieldJustPtr

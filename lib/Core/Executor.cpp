@@ -1565,6 +1565,16 @@ void klee::FillCallInfoOutput(Function* f,
       dumpFields(&arg->fields, base, state);
     }
   }
+  std::map<size_t, CallExtraPtr>::iterator i = info->extraPtrs.begin(),
+    e = info->extraPtrs.end();
+  for (; i != e; ++i) {
+    CallExtraPtr *extraPtr = &i->second;
+    size_t addr = i->first;
+    extraPtr->outVal =
+      state.readMemoryChunk(ConstantExpr::alloc(addr, 8*sizeof(size_t)),
+                            extraPtr->width);
+    dumpFields(&extraPtr->fields, addr, state);
+  }
 
   info->returned = true;
 
