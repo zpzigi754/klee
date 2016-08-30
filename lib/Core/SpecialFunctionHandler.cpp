@@ -1051,7 +1051,7 @@ void SpecialFunctionHandler::handleForbidAccess
     return;
   }
   const MemoryObject *mo = op.first;
-  if (mo->size != width) { //TODO: 8-factor here?
+  if (mo->size != width) {
     executor.terminateStateOnError
       (state, "The provided size does not match the size of the object.",
        "user.err");
@@ -1077,9 +1077,41 @@ void SpecialFunctionHandler::handleForbidAccess
 void SpecialFunctionHandler::handleAllowAccess
 (ExecutionState &state, KInstruction *target,
  std::vector<ref<Expr> > &arguments) {
-  ref<Expr> addr = arguments[0];
-  assert(isa<klee::ConstantExpr>(arguments[1]) && "Width must be a static constant.");
+  if (!isa<klee::ConstantExpr>(arguments[0])) {
+    executor.terminateStateOnError
+      (state, "Symbolic address for klee_allow_access is not supported",
+       "user.err");
+    return;
+  }
+  if (!isa<klee::ConstantExpr>(arguments[1])) {
+    executor.terminateStateOnError
+      (state, "Symbolic width for klee_allow_access is not supported",
+       "user.err");
+    return;
+  }
+  ref<ConstantExpr> addr = cast<klee::ConstantExpr>(arguments[0]);
   Expr::Width width = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
-  width = width * 8;//Convert to bits.
-  assert(false && "unsupported klee_allow_access.");
+
+  ObjectPair op;
+  bool success = state.addressSpace.resolveOne(addr, op);
+  if (!success) {
+    executor.terminateStateOnError
+      (state, "The address does not exist.", "user.err");
+    return;
+  }
+  const MemoryObject *mo = op.first;
+  if (mo->size != width) {
+    executor.terminateStateOnError
+      (state, "The provided size does not match the size of the object.",
+       "user.err");
+    return;
+  }
+  const ObjectState *os = op.second;
+  if (os->isAccessible()) {
+    executor.terminateStateOnError
+      (state, "The object is already accessible.",
+       "user.err");
+    return;
+  }
+  state.addressSpace.allowAccess(mo, os);
 }
