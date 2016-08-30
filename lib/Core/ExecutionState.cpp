@@ -1232,6 +1232,10 @@ bool klee::updateDiffMask(StateByteMask* mask,
     const ObjectState *refOs = i->second;
     const ObjectState *os = state.addressSpace.findObject(obj);
     if (refOs == os) continue;
+    assert(refOs->isAccessible() == os->isAccessible() &&
+           "No support for accessibility alteration "
+           "between loop iterations.");
+    if (!refOs->isAccessible()) continue;
     std::pair<std::map<const MemoryObject *, BitArray *>::iterator, bool>
       insRez = mask->insert
       (std::pair<const MemoryObject *, BitArray *>(obj, 0));
