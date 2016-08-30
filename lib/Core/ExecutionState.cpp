@@ -440,7 +440,8 @@ relevantConstraints(SymbolSet symbols) const {
 }
 
 ref<Expr> ExecutionState::readMemoryChunk(ref<Expr> addr,
-                                          Expr::Width width) const {
+                                          Expr::Width width,
+                                          bool circumventInaccessibility) const {
   ObjectPair op;
   ref<klee::ConstantExpr> address = cast<klee::ConstantExpr>(addr);
   bool success = addressSpace.resolveOne(address, op);
@@ -450,7 +451,7 @@ ref<Expr> ExecutionState::readMemoryChunk(ref<Expr> addr,
   //FIXME: assume inbounds.
   ref<Expr> offset = mo->getOffsetExpr(address);
   assert(0 < width && "Can not read a zero-length value.");
-  return os->read(offset, width);
+  return os->read(offset, width, circumventInaccessibility);
 }
 
 void ExecutionState::traceRet() {
@@ -497,7 +498,7 @@ void ExecutionState::traceArgPtr(ref<Expr> arg, Expr::Width width,
   argInfo->tracePointee = tracePointee;
   SymbolSet symbols = GetExprSymbols::visit(arg);
   if (tracePointee) {
-    argInfo->val = readMemoryChunk(arg, width);
+    argInfo->val = readMemoryChunk(arg, width, true);
     SymbolSet indirectSymbols = GetExprSymbols::visit(argInfo->val);
     symbols.insert(indirectSymbols.begin(), indirectSymbols.end());
   }
@@ -536,7 +537,7 @@ void ExecutionState::traceArgPtrField(ref<Expr> arg,
   size_t base = (cast<ConstantExpr>(arg))->getZExtValue();
   if (doTraceValue) {
     ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + offset, sizeof(size_t)*8);
-    descr.inVal = readMemoryChunk(addrExpr, width);
+    descr.inVal = readMemoryChunk(addrExpr, width, true);
   }
   descr.addr = base + offset;
   descr.doTraceValue = doTraceValue;
@@ -566,7 +567,7 @@ void ExecutionState::traceArgPtrNestedField(ref<Expr> arg,
   descr.name = name;
   size_t base = (cast<ConstantExpr>(arg))->getZExtValue();
   ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + base_offset + offset, sizeof(size_t)*8);
-  descr.inVal = readMemoryChunk(addrExpr, width);
+  descr.inVal = readMemoryChunk(addrExpr, width, true);
   descr.addr = base + base_offset + offset;
   descr.doTraceValue = true;
   argInfo->fields[base_offset].fields[offset] = descr;
@@ -582,7 +583,7 @@ void ExecutionState::traceExtraPtr(size_t ptr, Expr::Width width,
   extraPtr->name = name;
   extraPtr->width = width;
   extraPtr->inVal =
-    readMemoryChunk(ConstantExpr::alloc(ptr, sizeof(size_t)*8), width);
+    readMemoryChunk(ConstantExpr::alloc(ptr, sizeof(size_t)*8), width, true);
   SymbolSet indirectSymbols = GetExprSymbols::visit(extraPtr->inVal);
   std::vector<ref<Expr> > constrs = relevantConstraints(indirectSymbols);
   callPath.back().callContext.insert(callPath.back().callContext.end(),
@@ -606,7 +607,7 @@ void ExecutionState::traceExtraPtrField(size_t ptr,
   size_t base = ptr;
   if (doTraceValue) {
     ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + offset, sizeof(size_t)*8);
-    descr.inVal = readMemoryChunk(addrExpr, width);
+    descr.inVal = readMemoryChunk(addrExpr, width, true);
   }
   descr.addr = base + offset;
   descr.doTraceValue = doTraceValue;
