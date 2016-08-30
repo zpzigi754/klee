@@ -82,6 +82,7 @@ struct FieldDescr {
   ref<Expr> outVal;
   std::map<int, FieldDescr> fields;
 
+  bool sameInvocationValue(const FieldDescr& other) const;
   bool eq(const FieldDescr& other) const;
 };
 
@@ -112,11 +113,25 @@ struct RetVal {
   bool eq(const RetVal& other) const;
 };
 
+struct CallExtraPtr {
+  size_t ptr;
+  Expr::Width width;
+  ref<Expr> inVal;
+  ref<Expr> outVal;
+  std::map<int, FieldDescr> fields;
+
+  std::string name;
+
+  bool sameInvocationValue(const CallExtraPtr& other) const;
+  bool eq(const CallExtraPtr& other) const;
+};
+
 //TODO: Store assumptions increment as well. it is an important part of the call
 // these assumptions allow then to correctly match and distinguish call path prefixes.
 struct CallInfo {
   llvm::Function* f;
-  std::vector< CallArg > args;
+  std::vector<CallArg> args;
+  std::map<size_t, CallExtraPtr> extraPtrs;
   RetVal ret;
   bool returned;
   std::vector< ref<Expr> > callContext;
@@ -322,6 +337,12 @@ public:
                         bool doTraceValue);
   void traceArgPtrNestedField(ref<Expr> arg, int base_offset, int offset,
                               Expr::Width width, std::string name);
+  void traceExtraPtr(size_t ptr, Expr::Width width,
+                     std::string name,
+                     bool tracePointee);
+  void traceExtraPtrField(size_t ptr, int offset,
+                          Expr::Width width, std::string name,
+                          bool doTraceValue);
   void traceRetPtrField(int offset, Expr::Width width, std::string name,
                         bool doTraceValue);
   void traceRetPtrNestedField(int base_offset, int offset,

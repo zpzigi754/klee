@@ -572,6 +572,48 @@ void ExecutionState::traceArgPtrNestedField(ref<Expr> arg,
   argInfo->fields[base_offset].fields[offset] = descr;
 }
 
+void ExecutionState::traceExtraPtr(size_t ptr, Expr::Width width,
+                                   std::string name,
+                                   bool tracePointee) {
+  traceRet();
+  callPath.back().extraPtrs.insert(std::pair<const size_t, CallExtraPtr>(ptr, CallExtraPtr()));
+  CallExtraPtr *extraPtr = &callPath.back().extraPtrs[ptr];
+  extraPtr->ptr = ptr;
+  extraPtr->name = name;
+  extraPtr->width = width;
+  extraPtr->inVal =
+    readMemoryChunk(ConstantExpr::alloc(ptr, sizeof(size_t)*8), width);
+  SymbolSet indirectSymbols = GetExprSymbols::visit(extraPtr->inVal);
+  std::vector<ref<Expr> > constrs = relevantConstraints(indirectSymbols);
+  callPath.back().callContext.insert(callPath.back().callContext.end(),
+                                     constrs.begin(), constrs.end());
+}
+
+void ExecutionState::traceExtraPtrField(size_t ptr,
+                                        int offset,
+                                        Expr::Width width,
+                                        std::string name,
+                                        bool doTraceValue) {
+  assert(!callPath.empty() &&
+         callPath.back().f == stack.back().kf->function &&
+         "Must trace the function first to trace a particular field.");
+  CallExtraPtr *extraPtr = &callPath.back().extraPtrs[ptr];
+  assert(extraPtr->width > 0 && "Cannot fit a field into zero bytes.");
+  assert(extraPtr->fields.count(offset) == 0 && "Conflicting field.");
+  FieldDescr descr;
+  descr.width = width;
+  descr.name = name;
+  size_t base = ptr;
+  if (doTraceValue) {
+    ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + offset, sizeof(size_t)*8);
+    descr.inVal = readMemoryChunk(addrExpr, width);
+  }
+  descr.addr = base + offset;
+  descr.doTraceValue = doTraceValue;
+  extraPtr->fields[offset] = descr;
+}
+
+
 void ExecutionState::traceRetPtrField(int offset,
                                       Expr::Width width,
                                       std::string name,
@@ -813,6 +855,13 @@ bool FieldDescr::eq(const FieldDescr& other) const {
      (!other.outVal.isNull()) && 0 == outVal->compare(*other.outVal));
 }
 
+bool FieldDescr::sameInvocationValue(const FieldDescr& other) const {
+  return width == other.width &&
+    name == other.name &&
+    (inVal.isNull() ? other.inVal.isNull() :
+     (!other.inVal.isNull()) && 0 == inVal->compare(*other.inVal));
+}
+
 bool CallArg::eq(const CallArg& other) const {
   if (fields.size() != other.fields.size()) return false;
   if (expr.isNull()) {
@@ -857,6 +906,7 @@ bool CallArg::eq(const CallArg& other) const {
 
 // Essentially same as eq, but doe not compare the output states.
 bool CallArg::sameInvocationValue(const CallArg& other) const {
+  if (fields.size() != other.fields.size()) return false;
   if (expr.isNull()) {
     if (!other.expr.isNull()) return false;
   } else {
@@ -881,6 +931,13 @@ bool CallArg::sameInvocationValue(const CallArg& other) const {
     }
   } else {
     if (other.isPtr) return false;
+  }
+  std::map<int, FieldDescr>::const_iterator i = fields.begin(),
+    e = fields.end();
+  for (; i != e; ++i) {
+    std::map<int, FieldDescr>::const_iterator it = other.fields.find(i->first);
+    if (it == other.fields.end() ||
+        !it->second.sameInvocationValue(i->second)) return false;
   }
   return true;
 }
@@ -916,6 +973,54 @@ bool RetVal::eq(const RetVal& other) const {
   for (; i != e; ++i) {
     std::map<int, FieldDescr>::const_iterator it = other.fields.find(i->first);
     if (it == other.fields.end() || !it->second.eq(i->second)) return false;
+  }
+  return true;
+}
+
+bool CallExtraPtr::eq(const CallExtraPtr& other) const {
+  if (fields.size() != other.fields.size()) return false;
+  if (ptr != other.ptr) return false;
+  if (inVal.isNull()) {
+    if (!other.inVal.isNull()) return false;
+  } else {
+    if (other.inVal.isNull()) return false;
+    if (0 != inVal->compare(*other.inVal)) return false;
+  }
+  if (outVal.isNull()) {
+    if (!other.outVal.isNull()) return false;
+  } else {
+    if (other.outVal.isNull()) return false;
+    if (0 != outVal->compare(*other.outVal)) return false;
+  }
+  if (width != other.width) return false;
+  if (name != other.name) return false;
+  std::map<int, FieldDescr>::const_iterator i = fields.begin(),
+    e = fields.end();
+  for (; i != e; ++i) {
+    std::map<int, FieldDescr>::const_iterator it = other.fields.find(i->first);
+    if (it == other.fields.end() || !it->second.eq(i->second)) return false;
+  }
+  return true;
+}
+
+// Essentially same as eq, but doe not compare the output states.
+bool CallExtraPtr::sameInvocationValue(const CallExtraPtr& other) const {
+  if (fields.size() != other.fields.size()) return false;
+  if (ptr != other.ptr) return false;
+  if (inVal.isNull()) {
+    if (!other.inVal.isNull()) return false;
+  } else {
+    if (other.inVal.isNull()) return false;
+    if (0 != inVal->compare(*other.inVal)) return false;
+  }
+  if (width != other.width) return false;
+  if (name != other.name) return false;
+  std::map<int, FieldDescr>::const_iterator i = fields.begin(),
+    e = fields.end();
+  for (; i != e; ++i) {
+    std::map<int, FieldDescr>::const_iterator it = other.fields.find(i->first);
+    if (it == other.fields.end() ||
+        !it->second.sameInvocationValue(i->second)) return false;
   }
   return true;
 }
@@ -957,8 +1062,17 @@ bool equalContexts(const std::vector<ref<Expr> >& a,
 
 bool CallInfo::eq(const CallInfo& other) const {
   if (args.size() != other.args.size()) return false;
+  if (extraPtrs.size() != other.extraPtrs.size()) return false;
   for (unsigned i = 0; i < args.size(); ++i) {
     if (!args[i].eq(other.args[i])) return false;
+  }
+  std::map<size_t, CallExtraPtr>::const_iterator i = extraPtrs.begin(),
+    e = extraPtrs.end();
+  for (; i != e; ++i) {
+    std::map<size_t, CallExtraPtr>::const_iterator it =
+      other.extraPtrs.find(i->first);
+    if (it == other.extraPtrs.end() ||
+        !it->second.eq(i->second)) return false;
   }
   return f == other.f &&
     ret.eq(other.ret) &&
@@ -970,9 +1084,18 @@ bool CallInfo::eq(const CallInfo& other) const {
 bool CallInfo::sameInvocation(const CallInfo* other) const {
   //TODO: compare assumptions as well.
   if (args.size() != other->args.size()) return false;
+  if (extraPtrs.size() != other->extraPtrs.size()) return false;
   if (f != other->f) return false;
   for (unsigned i = 0; i < args.size(); ++i) {
     if (!args[i].sameInvocationValue(other->args[i])) return false;
+  }
+  std::map<size_t, CallExtraPtr>::const_iterator i = extraPtrs.begin(),
+    e = extraPtrs.end();
+  for (; i != e; ++i) {
+    std::map<size_t, CallExtraPtr>::const_iterator it =
+      other->extraPtrs.find(i->first);
+    if (it == other->extraPtrs.end() ||
+        !it->second.sameInvocationValue(i->second)) return false;
   }
   return equalContexts(callContext, other->callContext);
 }
