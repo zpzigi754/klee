@@ -173,7 +173,7 @@ public:
   bool readOnly;
 
   bool accessible;
-  llvm::Twine inaccessible_message;
+  std::string inaccessible_message;
 
 public:
   /// Create a new object state for the given memory object with concrete
