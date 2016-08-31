@@ -322,6 +322,11 @@ void ObjectState::forbidAccess(const llvm::Twine& msg) {
   inaccessible_message = msg.str();
 }
 
+void ObjectState::forbidAccessWithLastMessage() {
+  assert(accessible);
+  accessible = false;
+}
+
 void ObjectState::initializeToZero() {
   assert(accessible);
   makeConcrete();

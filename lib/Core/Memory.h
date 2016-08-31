@@ -195,6 +195,7 @@ public:
 
   bool isAccessible() const { return accessible; }
   void forbidAccess(const llvm::Twine &msg);
+  void forbidAccessWithLastMessage();
   void allowAccess() { assert(!accessible); accessible = true; }
 
   // make contents all concrete and zero
