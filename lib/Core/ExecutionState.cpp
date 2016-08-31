@@ -1197,9 +1197,17 @@ ExecutionState *LoopInProcess::makeRestartState() {
            "changedObjects must contain only existing objects.");
     assert(!os->readOnly &&
            "Read only object can not have been changed");
-    ObjectState *wos =
-      newState->addressSpace.getWriteable(mo, os);
+    ObjectState *wos;
+    bool wasInaccessible = !os->isAccessible();
+    if (wasInaccessible) {
+      wos = newState->addressSpace.allowAccess(mo, os);
+    } else {
+      wos = newState->addressSpace.getWriteable(mo, os);
+    }
     wos->forgetThese(bytes);
+    if (wasInaccessible) {
+      wos->forbidAccessWithLastMessage();
+    }
   }
   if (lastRoundUpdated) {
     LOG_LA("[" << loop << "]Some more objects were changed."
@@ -1235,7 +1243,6 @@ bool klee::updateDiffMask(StateByteMask* mask,
     assert(refOs->isAccessible() == os->isAccessible() &&
            "No support for accessibility alteration "
            "between loop iterations.");
-    if (!refOs->isAccessible()) continue;
     std::pair<std::map<const MemoryObject *, BitArray *>::iterator, bool>
       insRez = mask->insert
       (std::pair<const MemoryObject *, BitArray *>(obj, 0));
@@ -1246,8 +1253,8 @@ bool klee::updateDiffMask(StateByteMask* mask,
     unsigned size = obj->size;
     for (unsigned j = 0; j < size; ++j) {
       if (bytes->get(j)) continue;
-      ref<Expr> refVal = refOs->read8(j);
-      ref<Expr> val = os->read8(j);
+      ref<Expr> refVal = refOs->read8(j, true);
+      ref<Expr> val = os->read8(j, true);
       if (0 != refVal->compare(*val)) {
         //So: this byte was not diferent on the previous round,
         // it also differs structuraly now. It is time to make
