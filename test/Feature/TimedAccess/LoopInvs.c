@@ -11,10 +11,20 @@ int main() {
   printf("first here\n");
   // CHECK: first here
   klee_forbid_access(&x, sizeof(int), "message");
-  for (y = 0; klee_induce_invariants() & y < 10; ++y) {
+  for (y = 0; klee_induce_invariants() & (y < 10); ++y) {
     klee_allow_access(&x, sizeof(int));
-    x = 18;
+    x = x + 1;
     klee_forbid_access(&x, sizeof(int), "forbidden in the loop");
+  }
+  klee_allow_access(&x, sizeof(int));
+  // After the loop modifying x, it must have become symbolic,
+  // regardless of it being inaccessible between iterations.
+  if (x < 0) {
+    printf("x may be < 0\n");
+    // CHECK: x may be < 0
+  } else {
+    printf("x may be >= 0\n");
+    // CHECK: x may be >= 0
   }
   printf("successfully returned\n");
   // CHECK: successfully returned

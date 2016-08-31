@@ -121,7 +121,8 @@ namespace klee {
     /// \param mo The MemoryObject to allow access to an ObjectState for.
     /// \param os The current (inaccessible) ObjectState binding for the
     ///           MemoryObject.
-    void allowAccess(const MemoryObject *mo, const ObjectState *os);
+    /// \return An accessible and writeable ObjectState (\a os or a copy).
+    ObjectState *allowAccess(const MemoryObject *mo, const ObjectState *os);
 
     /// Copy the concrete values of all managed ObjectStates into the
     /// actual system memory location they were allocated at.
