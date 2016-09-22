@@ -40,6 +40,7 @@
 #include "llvm/LLVMContext.h"
 #include "llvm/Support/FileSystem.h"
 #endif
+#include "llvm/Support/Errno.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/Support/CommandLine.h"
@@ -1205,6 +1206,9 @@ static int initEnv(Module *mainModule) {
   */
 
   Function *mainFn = mainModule->getFunction(EntryPoint);
+  if (!mainFn) {
+    klee_error("'%s' function not found in module.", EntryPoint.c_str());
+  }
 
   if (mainFn->arg_size() < 2) {
     klee_error("Cannot handle ""--posix-runtime"" when main() has less than two arguments.\n");
@@ -1825,7 +1829,6 @@ int main(int argc, char **argv, char **envp) {
   }
 #endif
 
-
   if (WithPOSIXRuntime) {
     int r = initEnv(mainModule);
     if (r != 0)
@@ -1833,7 +1836,7 @@ int main(int argc, char **argv, char **envp) {
   }
 
   std::string LibraryDir = KleeHandler::getRunTimeLibraryPath(argv[0]);
-  Interpreter::ModuleOptions Opts(LibraryDir.c_str(),
+  Interpreter::ModuleOptions Opts(LibraryDir.c_str(), EntryPoint,
                                   /*Optimize=*/OptimizeModule,
                                   /*CheckDivZero=*/CheckDivZero,
                                   /*CheckOvershift=*/CheckOvershift);
@@ -1881,8 +1884,7 @@ int main(int argc, char **argv, char **envp) {
   // locale and other data and then calls main.
   Function *mainFn = mainModule->getFunction(EntryPoint);
   if (!mainFn) {
-    llvm::errs() << "'" << EntryPoint << "' function not found in module.\n";
-    return -1;
+    klee_error("'%s' function not found in module.", EntryPoint.c_str());
   }
 
   // FIXME: Change me to std types.
@@ -1981,10 +1983,8 @@ int main(int argc, char **argv, char **envp) {
     if (RunInDir != "") {
       int res = chdir(RunInDir.c_str());
       if (res < 0) {
-        char info[128];
-        char *str = strerror_r(errno, info, sizeof(info));
         klee_error("Unable to change directory to: %s - %s", RunInDir.c_str(),
-                   str);
+                   sys::StrError(errno).c_str());
       }
     }
 
@@ -2046,10 +2046,8 @@ int main(int argc, char **argv, char **envp) {
     if (RunInDir != "") {
       int res = chdir(RunInDir.c_str());
       if (res < 0) {
-        char info[128];
-        char *str = strerror_r(errno, info, sizeof(info));
         klee_error("Unable to change directory to: %s - %s", RunInDir.c_str(),
-                   str);
+                   sys::StrError(errno).c_str());
       }
     }
     interpreter->runFunctionAsMain(mainFn, pArgc, pArgv, pEnvp);
