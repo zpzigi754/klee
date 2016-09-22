@@ -134,7 +134,7 @@ KModule::~KModule() {
 /***/
 
 namespace llvm {
-extern void Optimize(Module*);
+extern void Optimize(Module *, const std::string &EntryPoint);
 }
 
 // what a hack
@@ -310,7 +310,7 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
   pm.run(*module);
 
   if (opts.Optimize)
-    Optimize(module);
+    Optimize(module, opts.EntryPoint);
 #if LLVM_VERSION_CODE < LLVM_VERSION(3, 3)
   // Force importing functions required by intrinsic lowering. Kind of
   // unfortunate clutter when we don't need them but we won't know
