@@ -113,7 +113,8 @@ public:
     ReadOnly,
     ReportError,
     User,
-    Unhandled
+    Inaccessible,
+    Unhandled,
   };
 
 private:
