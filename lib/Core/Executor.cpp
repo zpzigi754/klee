@@ -283,7 +283,8 @@ namespace {
 		    clEnumValN(Executor::ReadOnly, "ReadOnly", "Write to read-only memory"),
 		    clEnumValN(Executor::ReportError, "ReportError", "klee_report_error called"),
 		    clEnumValN(Executor::User, "User", "Wrong klee_* functions invocation"),
-		    clEnumValN(Executor::Unhandled, "Unhandled", "Unhandled instruction hit")
+		    clEnumValN(Executor::Inaccessible, "Inaccessible", "The memory access is forbidden for this address at this point by klee_forbid_access"),
+		    clEnumValN(Executor::Unhandled, "Unhandled", "Unhandled instruction hit"),
 		    KLEE_LLVM_CL_VAL_END),
 		  cl::ZeroOrMore);
 
@@ -331,6 +332,7 @@ const char *Executor::TerminateReasonNames[] = {
   [ ReadOnly ] = "readonly",
   [ ReportError ] = "reporterror",
   [ User ] = "user",
+  [ Inaccessible ] = "inaccessible",
   [ Unhandled ] = "xxx",
 };
 
@@ -3592,7 +3594,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
         msg << "memory error: object inaccessible. ";
         msg << "It is rendered inaccessible because: ";
         msg << os->inaccessible_message;
-        terminateStateOnError(state, msg.str(), "inaccessible.err");
+        terminateStateOnError(state, msg.str(), Inaccessible);
       }
 
       return;
@@ -3641,7 +3643,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
       msg << "memory error: object inaccessible. ";
       msg << "It is rendered inaccessible because: ";
       msg << os->inaccessible_message;
-      terminateStateOnError(state, msg.str(), "inaccessible.err");
+      terminateStateOnError(state, msg.str(), Inaccessible);
     }
 
     unbound = branches.second;

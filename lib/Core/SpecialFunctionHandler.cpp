@@ -821,7 +821,7 @@ void SpecialFunctionHandler::handleMakeSymbolic(ExecutionState &state,
       executor.terminateStateOnError
         (*s, llvm::Twine("cannot make inaccessible object symbolic") +
          "the object was rendered inaccessible due to:" +
-         old->inaccessible_message, "user.err");
+         old->inaccessible_message, Executor::Inaccessible);
       return;
     }
 
@@ -1072,13 +1072,13 @@ void SpecialFunctionHandler::handleForbidAccess
   if (!isa<klee::ConstantExpr>(arguments[0])) {
     executor.terminateStateOnError
       (state, "Symbolic address for klee_forbid_access is not supported",
-       "user.err");
+       Executor::Unhandled);
     return;
   }
   if (!isa<klee::ConstantExpr>(arguments[1])) {
     executor.terminateStateOnError
       (state, "Symbolic width for klee_forbid_access is not supported",
-       "user.err");
+       Executor::Unhandled);
     return;
   }
   ref<ConstantExpr> addr = cast<klee::ConstantExpr>(arguments[0]);
@@ -1089,27 +1089,27 @@ void SpecialFunctionHandler::handleForbidAccess
   bool success = state.addressSpace.resolveOne(addr, op);
   if (!success) {
     executor.terminateStateOnError
-      (state, "The address does not exist.", "user.err");
+      (state, "The address does not exist.", Executor::User);
     return;
   }
   const MemoryObject *mo = op.first;
   if (mo->size != width) {
     executor.terminateStateOnError
       (state, "The provided size does not match the size of the object.",
-       "user.err");
+       Executor::User);
     return;
   }
   const ObjectState *os = op.second;
   if (os->readOnly) {
     executor.terminateStateOnError
       (state, "The object is readonly, can not render it inaccessible",
-       "user.err");
+       Executor::User);
     return;
   }
   if (!os->isAccessible()) {
     executor.terminateStateOnError
       (state, "The object is already inaccessible.",
-       "user.err");
+       Executor::User);
     return;
   }
   ObjectState *wos = state.addressSpace.getWriteable(mo, os);
@@ -1122,13 +1122,13 @@ void SpecialFunctionHandler::handleAllowAccess
   if (!isa<klee::ConstantExpr>(arguments[0])) {
     executor.terminateStateOnError
       (state, "Symbolic address for klee_allow_access is not supported",
-       "user.err");
+       Executor::Unhandled);
     return;
   }
   if (!isa<klee::ConstantExpr>(arguments[1])) {
     executor.terminateStateOnError
       (state, "Symbolic width for klee_allow_access is not supported",
-       "user.err");
+       Executor::Unhandled);
     return;
   }
   ref<ConstantExpr> addr = cast<klee::ConstantExpr>(arguments[0]);
@@ -1138,21 +1138,21 @@ void SpecialFunctionHandler::handleAllowAccess
   bool success = state.addressSpace.resolveOne(addr, op);
   if (!success) {
     executor.terminateStateOnError
-      (state, "The address does not exist.", "user.err");
+      (state, "The address does not exist.", Executor::User);
     return;
   }
   const MemoryObject *mo = op.first;
   if (mo->size != width) {
     executor.terminateStateOnError
       (state, "The provided size does not match the size of the object.",
-       "user.err");
+       Executor::User);
     return;
   }
   const ObjectState *os = op.second;
   if (os->isAccessible()) {
     executor.terminateStateOnError
       (state, "The object is already accessible.",
-       "user.err");
+       Executor::User);
     return;
   }
   state.addressSpace.allowAccess(mo, os);
