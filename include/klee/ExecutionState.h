@@ -137,6 +137,7 @@ struct CallInfo {
   bool returned;
   std::vector< ref<Expr> > callContext;
   std::vector< ref<Expr> > returnContext;
+  llvm::DebugLoc callPlace;
 
   CallArg* getCallArgPtrp(ref<Expr> ptr);
   bool eq(const CallInfo& other) const;
