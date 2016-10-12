@@ -574,7 +574,7 @@ void KleeHandler::processTestCase(const ExecutionState &state,
 }
 
 bool dumpCallInfo(const CallInfo& ci, llvm::raw_ostream& file) {
-  file << ci.f->getName() <<"(";
+  file << ci.callPlace.getLine() <<":" <<ci.f->getName() <<"(";
   assert(ci.returned);
   for (std::vector< CallArg >::const_iterator argIter = ci.args.begin(),
          end = ci.args.end(); argIter != end; ++argIter) {
@@ -1122,7 +1122,7 @@ void CallTree::dumpCallPrefixesSExpr(std::list<CallInfo> accumulated_prefix,
     *file <<"(tip_calls (\n";
     for (std::vector<CallPathTip*>::const_iterator chi = ti->begin(),
            che = ti->end(); chi != che; ++chi) {
-      *file <<"; id: " <<(**chi).path_id <<"\n";
+      *file <<"; id: " <<(**chi).path_id <<"(" <<(**chi).call.callPlace.getLine() <<")\n";
       bool dumped = dumpCallInfoSExpr((**chi).call, *file);
       assert(dumped);
     }

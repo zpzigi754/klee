@@ -463,10 +463,10 @@ ref<Expr> ExecutionState::readMemoryChunk(ref<Expr> addr,
 
 void ExecutionState::traceRet() {
   if (callPath.empty() ||
+      callPath.back().returned ||
       callPath.back().f != stack.back().kf->function) {
-    assert((callPath.empty() || callPath.back().returned) &&
-           "Nested traced functions are not supported.");
     callPath.push_back(CallInfo());
+    callPath.back().callPlace = stack.back().caller->inst->getDebugLoc();
     callPath.back().f = stack.back().kf->function;
     callPath.back().returned = false;
   }
