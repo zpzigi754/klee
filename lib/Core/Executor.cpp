@@ -1512,6 +1512,8 @@ void klee::FillCallInfoOutput(Function* f,
     (dyn_cast<FunctionType>(cast<PointerType>(f->getType())->
                             getElementType()))->
     getReturnType();
+
+  assert(info->returned == false);
   if (!isVoidReturn) {
     info->ret.expr = result;
     info->ret.isPtr = retType->isPointerTy();
@@ -1563,7 +1565,7 @@ void klee::FillCallInfoOutput(Function* f,
   int numParams = info->args.size();
   for (int i = 0; i < numParams; ++i) {
     CallArg *arg = &info->args[i];
-    if (arg->isPtr && arg->funPtr == NULL) {
+    if (arg->isPtr && arg->tracePointee && arg->funPtr == NULL) {
       info->args[i].outVal = state.readMemoryChunk(arg->expr, arg->outWidth,
                                                    true);
       size_t base = (cast<ConstantExpr>(arg->expr))->getZExtValue();
