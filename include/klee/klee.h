@@ -195,6 +195,8 @@ extern "C" {
   void klee_trace_extra_ptr_field(void* ptr, int offset, int width, char* name);
   void klee_trace_extra_ptr_field_just_ptr(void* ptr, int offset,
                                            int width, char* name);
+  void klee_trace_extra_ptr_nested_field(void* ptr, int base_offset,
+                                         int offset, int width, char* name);
 
   void klee_forget_all();
 
@@ -202,6 +204,8 @@ extern "C" {
 
   void klee_forbid_access(void* ptr, int width, char* message);
   void klee_allow_access(void* ptr, int width);
+
+  void klee_dump_constraints();
 
 #ifdef __cplusplus
 }
