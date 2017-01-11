@@ -155,10 +155,12 @@ namespace klee {
     HANDLER(handleTraceExtraPtr);
     HANDLER(handleTraceExtraPtrField);
     HANDLER(handleTraceExtraPtrFieldJustPtr);
+    HANDLER(handleTraceExtraPtrNestedField);
     HANDLER(handleForgetAll);
     HANDLER(handleInduceInvariants);
     HANDLER(handleForbidAccess);
     HANDLER(handleAllowAccess);
+    HANDLER(handleDumpConstraints);
 #undef HANDLER
   };
 } // End klee namespace

@@ -352,11 +352,18 @@ public:
   void traceExtraPtrField(size_t ptr, int offset,
                           Expr::Width width, std::string name,
                           bool doTraceValue);
+  void traceExtraPtrNestedField(size_t ptr,
+                                int base_offset,
+                                int offset,
+                                Expr::Width width,
+                                std::string name,
+                                bool doTraceValue);
   void traceRetPtrField(int offset, Expr::Width width, std::string name,
                         bool doTraceValue);
   void traceRetPtrNestedField(int base_offset, int offset,
                               Expr::Width width, std::string name);
 
+  void dumpConstraints() const;
   void symbolizeConcretes();
   ExecutionState* finishLoopRound(KFunction *kf);
   void updateLoopAnalysisForBlockTransfer(llvm::BasicBlock *dst,
