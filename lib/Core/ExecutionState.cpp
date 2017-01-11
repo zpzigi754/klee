@@ -7,6 +7,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <stdio.h>
+#include <iostream>
+#include <ostream>
+#include <fstream>
+
 #include "klee/ExecutionState.h"
 
 #include "klee/Internal/Module/Cell.h"
@@ -572,6 +577,39 @@ void ExecutionState::traceArgPtrNestedField(ref<Expr> arg,
   descr.doTraceValue = true;
   argInfo->fields[base_offset].fields[offset] = descr;
 }
+
+void ExecutionState::traceExtraPtrNestedField(size_t ptr,
+                                              int base_offset,
+                                              int offset,
+                                              Expr::Width width,
+                                              std::string name,
+                                              bool doTraceValue) {
+  assert(!callPath.empty() &&
+         callPath.back().f == stack.back().kf->function &&
+         "Must trace the function first to trace a particular field.");
+  CallExtraPtr *extraPtr = &callPath.back().extraPtrs[ptr];
+  assert(extraPtr != 0 &&
+         "Must first trace the extra pointer to trace a particular field.");
+  assert(extraPtr->width > (unsigned)offset + (unsigned)base_offset &&
+         "Cannot fit a field into zero bytes.");
+  assert(extraPtr->fields.count(base_offset) != 0 &&
+         "Must first trace the field itself.");
+  assert(extraPtr->fields[base_offset].fields.count(offset) == 0 &&
+         "Conflicting field.");
+  FieldDescr descr;
+  descr.width = width;
+  descr.name = name;
+  size_t base = ptr;
+  if (doTraceValue) {
+    ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + base_offset + offset,
+                                                     sizeof(size_t)*8);
+    descr.inVal = readMemoryChunk(addrExpr, width, true);
+  }
+  descr.addr = base + base_offset + offset;
+  descr.doTraceValue = doTraceValue;
+  extraPtr->fields[base_offset].fields[offset] = descr;
+}
+
 
 void ExecutionState::traceExtraPtr(size_t ptr, Expr::Width width,
                                    std::string name,
@@ -1297,4 +1335,37 @@ ExecutionState *LoopInProcess::nextRoundState(bool *analysisFinished) {
   }
   *analysisFinished = false;
   return 0;
+}
+
+void ExecutionState::dumpConstraints() const {
+  const char* digits[10] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"};
+  static int cnt = 0;
+  ++cnt;
+  std::string fname = "constraints";
+
+  int tmp = cnt;
+  while (0 < tmp) {fname += digits[tmp%10]; tmp /= 10;}
+  fname += ".txt";
+  std::string Error;
+  llvm::raw_ostream *file = new llvm::raw_fd_ostream(fname.c_str(), Error, llvm::sys::fs::F_None);
+  if (!Error.empty()) {
+    printf("error opening file \"%s\".  KLEE may have run out of file "
+           "descriptors: try to increase the maximum number of open file "
+           "descriptors by using ulimit (%s).",
+           fname.c_str(), Error.c_str());
+    delete file;
+    file = NULL;
+    return;
+  }
+  *file <<";;-- Constraints --\n";
+  for (ConstraintManager::constraint_iterator ci = constraints.begin(),
+         cEnd = constraints.end(); ci != cEnd; ++ci) {
+    *file <<**ci<<"\n";
+  }
+  delete file;
+  // for (ConstraintManager::constraint_iterator ci = constraints.begin(),
+  //        cEnd = constraints.end(); ci != cEnd; ++ci) {
+  //   const ref<Expr> constraint = *ci;
+  //   std::cout <<*constraint <<std::endl;
+  //}
 }
