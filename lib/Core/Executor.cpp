@@ -1664,10 +1664,8 @@ void klee::FillCallInfoOutput(Function* f,
 
   info->returned = true;
 
-  SymbolSet symbols = info->computeRetSymbolSet();
-  std::vector<ref<Expr> > constrs = state.relevantConstraints(symbols);
-  info->returnContext.insert(info->returnContext.end(),
-                             constrs.begin(), constrs.end());
+  // VVV the ret-context constraints will be recorded when the path is finished
+  // (there will be more constraints by then) (see recordCallPathConstraints).
 }
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
@@ -3038,6 +3036,7 @@ void Executor::terminateState(ExecutionState &state) {
 
   if (state.loopInProcess.isNull()) {
     if (state.doTrace) {
+      state.recordCallPathConstraints();
       interpreterHandler->processCallPath(state);
     }
     interpreterHandler->incPathsExplored();

@@ -141,8 +141,6 @@ struct CallInfo {
   CallArg* getCallArgPtrp(ref<Expr> ptr);
   bool eq(const CallInfo& other) const;
   bool sameInvocation(const CallInfo* other) const;
-  SymbolSet computeSymbolicVariablesSet() const;
-  SymbolSet computeInvocationSymbolSet() const;
   SymbolSet computeRetSymbolSet() const;
 };
 
@@ -355,6 +353,7 @@ public:
                         bool doTraceValue);
   void traceRetPtrNestedField(int base_offset, int offset,
                               Expr::Width width, std::string name);
+  void recordCallPathConstraints();
 
   void dumpConstraints() const;
   void symbolizeConcretes();

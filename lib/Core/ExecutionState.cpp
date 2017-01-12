@@ -697,6 +697,16 @@ void ExecutionState::traceRetPtrNestedField(int base_offset,
   ret->fields[base_offset].fields[offset] = descr;
 }
 
+void ExecutionState::recordCallPathConstraints() {
+  for (std::vector<CallInfo>::iterator i = callPath.begin(),
+         e = callPath.end(); i != e; ++i) {
+    SymbolSet symbols = i->computeRetSymbolSet();
+    std::vector<ref<Expr> > constrs = relevantConstraints(symbols);
+    i->returnContext.insert(i->returnContext.end(),
+                            constrs.begin(), constrs.end());
+  }
+}
+
 void ExecutionState::symbolizeConcretes() {
   for (MemoryMap::iterator obj_I = addressSpace.objects.begin(),
          obj_E = addressSpace.objects.end(); obj_I != obj_E; ++obj_I) {
@@ -1139,19 +1149,6 @@ bool CallInfo::sameInvocation(const CallInfo* other) const {
   return equalContexts(callContext, other->callContext);
 }
 
-SymbolSet CallInfo::computeInvocationSymbolSet() const {
-  SymbolSet symbols;
-  for (unsigned i = 0; i < args.size(); ++i) {
-    SymbolSet argSymbols = GetExprSymbols::visit(args[i].expr);
-    symbols.insert(argSymbols.begin(), argSymbols.end());
-    if (args[i].isPtr && args[i].funPtr == NULL && args[i].tracePointee) {
-      argSymbols = GetExprSymbols::visit(args[i].val);
-      symbols.insert(argSymbols.begin(), argSymbols.end());
-    }
-  }
-  return symbols;
-}
-
 SymbolSet CallInfo::computeRetSymbolSet() const {
   assert(returned && "incomplete");
   SymbolSet symbols;
@@ -1168,13 +1165,11 @@ SymbolSet CallInfo::computeRetSymbolSet() const {
       symbols.insert(argSymbols.begin(), argSymbols.end());
     }
   }
-  return symbols;
-}
-
-SymbolSet CallInfo::computeSymbolicVariablesSet() const {
-  SymbolSet symbols = computeInvocationSymbolSet();
-  SymbolSet retSymbols = computeRetSymbolSet();
-  symbols.insert(retSymbols.begin(), retSymbols.end());
+  for (std::map<size_t, CallExtraPtr>::const_iterator i = extraPtrs.begin(),
+         e = extraPtrs.end(); i != e; ++i) {
+    SymbolSet indirectSymbols = GetExprSymbols::visit(i->second.outVal);
+    symbols.insert(indirectSymbols.begin(), indirectSymbols.end());
+  }
   return symbols;
 }
 
