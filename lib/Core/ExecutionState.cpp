@@ -46,7 +46,7 @@ namespace {
 /***/
 
 StackFrame::StackFrame(KInstIterator _caller, KFunction *_kf)
-  : caller(_caller), kf(_kf), callPathNode(0), 
+  : caller(_caller), kf(_kf), callPathNode(0),
     minDistToUncoveredOnReturn(0), varargs(0) {
   locals = new Cell[kf->numRegisters];
 }
@@ -84,6 +84,7 @@ ExecutionState::ExecutionState(KFunction *kf) :
     forkDisabled(false),
     ptreeNode(0),
     steppedInstructions(0),
+    relevantSymbols(),
     doTrace(true) {
   pushFrame(0, kf);
 }
@@ -92,6 +93,7 @@ ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions)
   : executionStateForLoopInProcess(0),
     constraints(assumptions),
     queryCost(0.), ptreeNode(0),
+    relevantSymbols(),
     doTrace(true) {}
 
 ExecutionState::~ExecutionState() {
@@ -143,6 +145,7 @@ ExecutionState::ExecutionState(const ExecutionState& state):
     openMergeStack(state.openMergeStack),
     steppedInstructions(state.steppedInstructions),
     callPath(state.callPath),
+    relevantSymbols(state.relevantSymbols),
     doTrace(state.doTrace)
 {
   for (unsigned int i=0; i<symbolics.size(); i++)
@@ -470,10 +473,18 @@ void ExecutionState::traceRet() {
   if (callPath.empty() ||
       callPath.back().returned ||
       callPath.back().f != stack.back().kf->function) {
+    if (!callPath.empty()) {
+      SymbolSet symbols = callPath.back().computeRetSymbolSet();
+      relevantSymbols.insert(symbols.begin(), symbols.end());
+    }
     callPath.push_back(CallInfo());
     callPath.back().callPlace = stack.back().caller->inst->getDebugLoc();
     callPath.back().f = stack.back().kf->function;
     callPath.back().returned = false;
+    std::vector<ref<Expr> > constrs =
+      relevantConstraints(relevantSymbols);
+    callPath.back().callContext.insert(callPath.back().callContext.end(),
+                                       constrs.begin(), constrs.end());
   }
 }
 
@@ -516,7 +527,7 @@ void ExecutionState::traceArgPtr(ref<Expr> arg, Expr::Width width,
   }
   std::vector<ref<Expr> > constrs = relevantConstraints(symbols);
   callPath.back().callContext.insert(callPath.back().callContext.end(),
-                              constrs.begin(), constrs.end());
+                                     constrs.begin(), constrs.end());
 }
 
 void ExecutionState::traceArgFunPtr(ref<Expr> arg,
@@ -704,14 +715,14 @@ void ExecutionState::traceRetPtrNestedField(int base_offset,
   ret->fields[base_offset].fields[offset] = descr;
 }
 
-void ExecutionState::recordCallPathConstraints() {
-  for (std::vector<CallInfo>::iterator i = callPath.begin(),
-         e = callPath.end(); i != e; ++i) {
-    SymbolSet symbols = i->computeRetSymbolSet();
-    std::vector<ref<Expr> > constrs = relevantConstraints(symbols);
-    i->returnContext.insert(i->returnContext.end(),
-                            constrs.begin(), constrs.end());
-  }
+void ExecutionState::recordRetConstraints(CallInfo *info) const {
+  assert(!callPath.empty() &&
+         info->f == stack.back().kf->function);
+  SymbolSet symbols = info->computeRetSymbolSet();
+
+  std::vector<ref<Expr> > constrs = relevantConstraints(symbols);
+  info->returnContext.insert(info->returnContext.end(),
+                             constrs.begin(), constrs.end());
 }
 
 void ExecutionState::symbolizeConcretes() {
@@ -1346,7 +1357,7 @@ void ExecutionState::dumpConstraints() const {
   std::string fname = "constraints";
 
   int tmp = cnt;
-  while (0 < tmp) {fname += digits[tmp%10]; tmp /= 10;}
+  while (0 < tmp) {fname = digits[tmp%10] + fname; tmp /= 10;}
   fname += ".txt";
   std::string Error;
   llvm::raw_ostream *file = new llvm::raw_fd_ostream(fname.c_str(), Error, llvm::sys::fs::F_None);

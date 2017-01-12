@@ -1586,8 +1586,7 @@ void klee::FillCallInfoOutput(Function* f,
 
   info->returned = true;
 
-  // VVV the ret-context constraints will be recorded when the path is finished
-  // (there will be more constraints by then) (see recordCallPathConstraints).
+  state.recordRetConstraints(info);
 }
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
@@ -3017,7 +3016,6 @@ void Executor::terminateState(ExecutionState &state) {
 
   if (state.loopInProcess.isNull()) {
     if (state.doTrace) {
-      state.recordCallPathConstraints();
       interpreterHandler->processCallPath(state);
     }
     interpreterHandler->incPathsExplored();

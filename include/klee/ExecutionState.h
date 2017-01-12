@@ -279,6 +279,7 @@ public:
   std::set<std::string> arrayNames;
 
   std::vector<CallInfo> callPath;
+  SymbolSet relevantSymbols;
 
   /// @brief: a flag indicating that the state is genuine and not
   ///  a product of some ancillary analysis, like loop-invariant search.
@@ -360,17 +361,18 @@ public:
                         bool doTraceValue);
   void traceRetPtrNestedField(int base_offset, int offset,
                               Expr::Width width, std::string name);
-  void recordCallPathConstraints();
+
+  void recordRetConstraints(CallInfo *info) const;
 
   void dumpConstraints() const;
   void symbolizeConcretes();
   ExecutionState* finishLoopRound(KFunction *kf);
   void updateLoopAnalysisForBlockTransfer(llvm::BasicBlock *dst,
                                           llvm::BasicBlock *src,
-                                          TimingSolver* solver,
+                                          TimingSolver *solver,
                                           bool *terminate);
   std::vector<ref<Expr> > relevantConstraints(SymbolSet symbols) const;
-  void terminateState(ExecutionState** replace);
+  void terminateState(ExecutionState **replace);
   void induceInvariantsForThisLoop(KInstruction *target);
   void startInvariantSearch();
 };
