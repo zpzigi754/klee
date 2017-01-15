@@ -120,6 +120,8 @@ struct CallExtraPtr {
   ref<Expr> inVal;
   ref<Expr> outVal;
   std::map<int, FieldDescr> fields;
+  bool accessibleIn;
+  bool accessibleOut;
 
   std::string name;
 
@@ -328,6 +330,7 @@ public:
 
   bool merge(const ExecutionState &b);
   void dumpStack(llvm::raw_ostream &out) const;
+  bool isAccessibleAddr(ref<Expr> addr) const;
   ref<Expr> readMemoryChunk(ref<Expr> addr,
                             Expr::Width width,
                             bool circumventInaccessibility) const;

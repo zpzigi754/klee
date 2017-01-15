@@ -1577,6 +1577,8 @@ void klee::FillCallInfoOutput(Function* f,
   for (; i != e; ++i) {
     CallExtraPtr *extraPtr = &i->second;
     size_t addr = i->first;
+    extraPtr->accessibleOut =
+      state.isAccessibleAddr(ConstantExpr::alloc(addr, 8*sizeof(size_t)));
     extraPtr->outVal =
       state.readMemoryChunk(ConstantExpr::alloc(addr, 8*sizeof(size_t)),
                             extraPtr->width,

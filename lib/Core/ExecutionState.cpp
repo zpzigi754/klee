@@ -454,6 +454,15 @@ relevantConstraints(SymbolSet symbols) const {
   return ret;
 }
 
+bool ExecutionState::isAccessibleAddr(ref<Expr> addr) const {
+  ObjectPair op;
+  ref<klee::ConstantExpr> address = cast<klee::ConstantExpr>(addr);
+  bool success = addressSpace.resolveOne(address, op);
+  assert(success && "Unknown pointer result!");
+  const ObjectState *os = op.second;
+  return os->isAccessible();
+}
+
 ref<Expr> ExecutionState::readMemoryChunk(ref<Expr> addr,
                                           Expr::Width width,
                                           bool circumventInaccessibility) const {
@@ -640,6 +649,8 @@ void ExecutionState::traceExtraPtr(size_t ptr, Expr::Width width,
   extraPtr->width = width;
   extraPtr->inVal =
     readMemoryChunk(ConstantExpr::alloc(ptr, sizeof(size_t)*8), width, true);
+  extraPtr->accessibleIn =
+    isAccessibleAddr(ConstantExpr::alloc(ptr, 8*sizeof(size_t)));
   SymbolSet indirectSymbols = GetExprSymbols::visit(extraPtr->inVal);
   std::vector<ref<Expr> > constrs = relevantConstraints(indirectSymbols);
   callPath.back().callContext.insert(callPath.back().callContext.end(),
@@ -1047,6 +1058,8 @@ bool RetVal::eq(const RetVal& other) const {
 bool CallExtraPtr::eq(const CallExtraPtr& other) const {
   if (fields.size() != other.fields.size()) return false;
   if (ptr != other.ptr) return false;
+  if (accessibleIn != other.accessibleIn) return false;
+  if (accessibleOut != other.accessibleOut) return false;
   if (inVal.isNull()) {
     if (!other.inVal.isNull()) return false;
   } else {
@@ -1074,6 +1087,7 @@ bool CallExtraPtr::eq(const CallExtraPtr& other) const {
 bool CallExtraPtr::sameInvocationValue(const CallExtraPtr& other) const {
   if (fields.size() != other.fields.size()) return false;
   if (ptr != other.ptr) return false;
+  if (accessibleIn != other.accessibleIn) return false;
   if (inVal.isNull()) {
     if (!other.inVal.isNull()) return false;
   } else {
