@@ -734,13 +734,30 @@ bool dumpExtraPtrSExpr(const CallExtraPtr& cep, llvm::raw_ostream& file) {
   file <<"\n((pname \"" <<cep.name <<"\")\n";
   file <<"(value " <<cep.ptr <<")\n";
   file <<"(ptee ";
-  file <<"((before ((full ("<<*cep.inVal <<"))\n";
-  dumpFieldsInSExpr(cep.fields, file);
+  if (cep.accessibleIn) {
+    if (cep.accessibleOut) {
+      file <<"(Changing (((full (" <<*cep.inVal <<"))\n";
+      dumpFieldsInSExpr(cep.fields, file);
+      file <<")\n" <<"((full (" <<*cep.outVal <<"))\n";
+      dumpFieldsOutSExpr(cep.fields, file);
+      file <<")))\n";
+    } else {
+      file <<"(Closing ((full (" <<*cep.inVal <<"))\n";
+      dumpFieldsInSExpr(cep.fields, file);
+      file <<"))\n";
+    }
+  } else {
+    if (cep.accessibleOut) {
+      file <<"(Opening ((full (" <<*cep.outVal <<"))\n";
+      dumpFieldsOutSExpr(cep.fields, file);
+      file <<"))\n";
+    } else {
+      llvm::errs() <<"The extra pointer must be accessible either at "
+                   <<"the beginning of a function, at its end or both.\n";
+      return false;
+    }
+  }
   file <<"))\n";
-  if (cep.outVal.isNull()) return false;
-  file <<"(after ((full (" <<*cep.outVal <<"))\n";
-  dumpFieldsOutSExpr(cep.fields, file);
-  file <<")))))";
   return true;
 }
 
