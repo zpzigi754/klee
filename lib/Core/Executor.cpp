@@ -1580,9 +1580,10 @@ void klee::FillCallInfoOutput(Function* f,
     extraPtr->accessibleOut =
       state.isAccessibleAddr(ConstantExpr::alloc(addr, 8*sizeof(size_t)));
     extraPtr->outVal =
-      state.readMemoryChunk(ConstantExpr::alloc(addr, 8*sizeof(size_t)),
-                            extraPtr->width,
-                            true);
+      state.constraints.simplifyExpr
+      (state.readMemoryChunk(ConstantExpr::alloc(addr, 8*sizeof(size_t)),
+                             extraPtr->width,
+                             true));
     dumpFields(&extraPtr->fields, addr, state);
   }
 

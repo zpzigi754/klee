@@ -648,7 +648,8 @@ void ExecutionState::traceExtraPtr(size_t ptr, Expr::Width width,
   extraPtr->name = name;
   extraPtr->width = width;
   extraPtr->inVal =
-    readMemoryChunk(ConstantExpr::alloc(ptr, sizeof(size_t)*8), width, true);
+    constraints.simplifyExpr
+    (readMemoryChunk(ConstantExpr::alloc(ptr, sizeof(size_t)*8), width, true));
   extraPtr->accessibleIn =
     isAccessibleAddr(ConstantExpr::alloc(ptr, 8*sizeof(size_t)));
   SymbolSet indirectSymbols = GetExprSymbols::visit(extraPtr->inVal);

@@ -952,7 +952,12 @@ void SpecialFunctionHandler::handleTraceExtraPtr(ExecutionState &state,
                                                  KInstruction *target,
                                                  std::vector<ref<Expr> >
                                                  &arguments) {
-  assert(isa<klee::ConstantExpr>(arguments[1]) && "Width must be a static constant.");
+  if (!isa<klee::ConstantExpr>(arguments[1])) {
+    executor.terminateStateOnError
+      (state, "Width must be a static constant.",
+       Executor::User);
+    return;
+  }
   Expr::Width width = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
   width = width * 8;//Convert to bits.
   std::string name = readStringAtAddress(state, arguments[2]);
@@ -1057,7 +1062,12 @@ void SpecialFunctionHandler::handleTraceParamJustPtr(ExecutionState &state,
                                                      KInstruction *target,
                                                      std::vector<ref<Expr> >
                                                      &arguments) {
-  assert(isa<klee::ConstantExpr>(arguments[1]) && "Width must be a static constant.");
+  if (!isa<klee::ConstantExpr>(arguments[1])) {
+    executor.terminateStateOnError
+      (state, "Width must be a static constant.",
+       Executor::User);
+    return;
+  }
   Expr::Width width = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
   width = width * 8;//Convert to bits.
   std::string name = readStringAtAddress(state, arguments[2]);
