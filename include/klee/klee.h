@@ -197,6 +197,9 @@ extern "C" {
                                            int width, char* name);
   void klee_trace_extra_ptr_nested_field(void* ptr, int base_offset,
                                          int offset, int width, char* name);
+  void klee_trace_extra_ptr_nested_nested_field(void* ptr, int base_base_offset,
+                                                int base_offset, int offset,
+                                                int width, char* name);
 
   void klee_forget_all();
 
