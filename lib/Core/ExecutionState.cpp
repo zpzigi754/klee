@@ -630,6 +630,45 @@ void ExecutionState::traceExtraPtrNestedField(size_t ptr,
   extraPtr->fields[base_offset].fields[offset] = descr;
 }
 
+void ExecutionState::traceExtraPtrNestedNestedField(size_t ptr,
+                                                    int base_base_offset,
+                                                    int base_offset,
+                                                    int offset,
+                                                    Expr::Width width,
+                                                    std::string name,
+                                                    bool doTraceValue) {
+  assert(!callPath.empty() &&
+         callPath.back().f == stack.back().kf->function &&
+         "Must trace the function first to trace a particular field.");
+  CallExtraPtr *extraPtr = &callPath.back().extraPtrs[ptr];
+  assert(extraPtr != 0 &&
+         "Must first trace the extra pointer to trace a particular field.");
+  assert(extraPtr->width >
+         (unsigned)offset + (unsigned)base_offset + (unsigned)base_base_offset &&
+         "Cannot fit a field into zero bytes.");
+  assert(extraPtr->fields.count(base_base_offset) != 0 &&
+         "Must first trace the base base field itself.");
+  assert(extraPtr->fields[base_base_offset].fields.count(base_offset) != 0 &&
+         "Must first trace the base field itself.");
+  assert(extraPtr->
+         fields[base_base_offset].
+         fields[base_offset].
+         fields.count(offset) == 0 &&
+         "Conflicting field.");
+  FieldDescr descr;
+  descr.width = width;
+  descr.name = name;
+  size_t base = ptr;
+  descr.addr = base + base_base_offset + base_offset + offset;
+  if (doTraceValue) {
+    ref<ConstantExpr> addrExpr = ConstantExpr::alloc(descr.addr,
+                                                     sizeof(size_t)*8);
+    descr.inVal = readMemoryChunk(addrExpr, width, true);
+  }
+  descr.doTraceValue = doTraceValue;
+  extraPtr->fields[base_base_offset].fields[base_offset].fields[offset] = descr;
+}
+
 
 void ExecutionState::traceExtraPtr(size_t ptr, Expr::Width width,
                                    std::string name,

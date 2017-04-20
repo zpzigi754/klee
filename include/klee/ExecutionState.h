@@ -353,6 +353,13 @@ public:
                                 Expr::Width width,
                                 std::string name,
                                 bool doTraceValue);
+  void traceExtraPtrNestedNestedField(size_t ptr,
+                                      int base_base_offset,
+                                      int base_offset,
+                                      int offset,
+                                      Expr::Width width,
+                                                      std::string name,
+                                      bool doTraceValue);
   void traceRetPtrField(int offset, Expr::Width width, std::string name,
                         bool doTraceValue);
   void traceRetPtrNestedField(int base_offset, int offset,
