@@ -1517,7 +1517,7 @@ void klee::FillCallInfoOutput(Function* f,
   if (!isVoidReturn) {
     info->ret.expr = result;
     info->ret.isPtr = retType->isPointerTy();
-    if (info->ret.isPtr && info->ret.tracePointee) {
+    if (info->ret.isPtr && info->ret.pointee.doTraceValue) {
       llvm::Type *elementType = (cast<PointerType>(retType))->
         getElementType();
       assert(isa<klee::ConstantExpr>(result) &&
@@ -1527,15 +1527,15 @@ void klee::FillCallInfoOutput(Function* f,
         uint64_t addr = address->getZExtValue();
         info->ret.funPtr = (Function*) addr;
       } else {
-        if (info->ret.width == 0) {
-          info->ret.width = exec.getWidthForLLVMType(elementType);
+        if (info->ret.pointee.width == 0) {
+          info->ret.pointee.width = exec.getWidthForLLVMType(elementType);
         }
-        info->ret.val = state.readMemoryChunk(address,
-                                              info->ret.width,
-                                              true);
+        info->ret.pointee.outVal = state.readMemoryChunk(address,
+                                                         info->ret.pointee.width,
+                                                         true);
         info->ret.funPtr = NULL;
         size_t base = address->getZExtValue();
-        dumpFields(&info->ret.fields, base, state);
+        dumpFields(&info->ret.pointee.fields, base, state);
       }
     }
     if (retType->isStructTy()) {
@@ -1556,7 +1556,7 @@ void klee::FillCallInfoOutput(Function* f,
                                   exec.getWidthForLLVMType(sizeType)) );
       Expr::Width width = 8*rezS->getZExtValue();
       info->ret.isPtr = true;
-      info->ret.val = state.readMemoryChunk(rezP, width, true);
+      info->ret.pointee.outVal = state.readMemoryChunk(rezP, width, true);
       info->ret.funPtr = NULL;
       info->ret.expr = rezP;
     }
@@ -1565,11 +1565,13 @@ void klee::FillCallInfoOutput(Function* f,
   int numParams = info->args.size();
   for (int i = 0; i < numParams; ++i) {
     CallArg *arg = &info->args[i];
-    if (arg->isPtr && arg->tracePointee && arg->funPtr == NULL) {
-      info->args[i].outVal = state.readMemoryChunk(arg->expr, arg->outWidth,
-                                                   true);
+    if (arg->isPtr && arg->pointee.doTraceValue && arg->funPtr == NULL) {
+      info->args[i].pointee.outVal =
+        state.readMemoryChunk(arg->expr,
+                              arg->pointee.width,
+                              true);
       size_t base = (cast<ConstantExpr>(arg->expr))->getZExtValue();
-      dumpFields(&arg->fields, base, state);
+      dumpFields(&arg->pointee.fields, base, state);
     }
   }
   std::map<size_t, CallExtraPtr>::iterator i = info->extraPtrs.begin(),
@@ -1579,12 +1581,12 @@ void klee::FillCallInfoOutput(Function* f,
     size_t addr = i->first;
     extraPtr->accessibleOut =
       state.isAccessibleAddr(ConstantExpr::alloc(addr, 8*sizeof(size_t)));
-    extraPtr->outVal =
+    extraPtr->pointee.outVal =
       state.constraints.simplifyExpr
       (state.readMemoryChunk(ConstantExpr::alloc(addr, 8*sizeof(size_t)),
-                             extraPtr->width,
+                             extraPtr->pointee.width,
                              true));
-    dumpFields(&extraPtr->fields, addr, state);
+    dumpFields(&extraPtr->pointee.fields, addr, state);
   }
 
   info->returned = true;
