@@ -76,6 +76,7 @@ struct StackFrame {
 
 struct FieldDescr {
   Expr::Width width;
+  std::string type;
   std::string name;
   size_t addr;
   bool doTraceValue;
@@ -89,14 +90,11 @@ struct FieldDescr {
 
 struct CallArg {
   ref<Expr> expr;
-  ref<Expr> val;
   bool isPtr;
-  bool tracePointee;
-  ref<Expr> outVal;
-  Expr::Width outWidth;
   llvm::Function* funPtr;
   std::string name;
-  std::map<int, FieldDescr> fields;
+
+  FieldDescr pointee;
 
   bool eq(const CallArg& other) const;
   bool sameInvocationValue(const CallArg& other) const;
@@ -105,21 +103,16 @@ struct CallArg {
 struct RetVal {
   ref<Expr> expr;
   bool isPtr;
-  bool tracePointee;
-  Expr::Width width;
-  ref<Expr> val;
   llvm::Function* funPtr;
-  std::map<int, FieldDescr> fields;
+
+  FieldDescr pointee;
 
   bool eq(const RetVal& other) const;
 };
 
 struct CallExtraPtr {
   size_t ptr;
-  Expr::Width width;
-  ref<Expr> inVal;
-  ref<Expr> outVal;
-  std::map<int, FieldDescr> fields;
+  FieldDescr pointee;
   bool accessibleIn;
   bool accessibleOut;
 
