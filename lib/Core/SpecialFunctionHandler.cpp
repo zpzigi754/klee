@@ -963,8 +963,9 @@ void SpecialFunctionHandler::handleTraceExtraPtr(ExecutionState &state,
   Expr::Width width = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
   width = width * 8;//Convert to bits.
   std::string name = readStringAtAddress(state, arguments[2]);
+  std::string type = readStringAtAddress(state, arguments[3]);
   size_t ptr = (cast<ConstantExpr>(arguments[0]))->getZExtValue();
-  state.traceExtraPtr(ptr, width, name, true);
+  state.traceExtraPtr(ptr, width, name, type, true);
 }
 
 

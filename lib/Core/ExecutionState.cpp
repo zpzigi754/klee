@@ -687,6 +687,7 @@ void ExecutionState::traceExtraPtrNestedNestedField(size_t ptr,
 
 void ExecutionState::traceExtraPtr(size_t ptr, Expr::Width width,
                                    std::string name,
+                                   std::string type,
                                    bool tracePointee) {
   traceRet();
   callPath.back().extraPtrs.
@@ -695,6 +696,7 @@ void ExecutionState::traceExtraPtr(size_t ptr, Expr::Width width,
   extraPtr->ptr = ptr;
   extraPtr->name = name;
   extraPtr->pointee.width = width;
+  extraPtr->pointee.type = type;
   extraPtr->pointee.inVal =
     constraints.simplifyExpr
     (readMemoryChunk(ConstantExpr::alloc(ptr, sizeof(size_t)*8), width, true));
