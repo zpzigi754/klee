@@ -521,11 +521,13 @@ void ExecutionState::traceArgValue(ref<Expr> val, std::string name) {
 
 void ExecutionState::traceArgPtr(ref<Expr> arg, Expr::Width width,
                                  std::string name,
+                                 std::string type,
                                  bool tracePointee) {
   traceArgValue(arg, name);
   CallArg *argInfo = &callPath.back().args.back();
   argInfo->isPtr = true;
   argInfo->pointee.width = width;
+  argInfo->pointee.type = type;
   argInfo->funPtr = NULL;
   argInfo->pointee.doTraceValue = tracePointee;
   SymbolSet symbols = GetExprSymbols::visit(arg);
