@@ -610,12 +610,13 @@ bool dumpCallInfo(const CallInfo& ci, llvm::raw_ostream& file) {
     if (arg->isPtr) {
       file <<"&";
       if (arg->funPtr == NULL) {
-        if (arg->tracePointee) {
-          file <<"[" <<*arg->val;
-          if (arg->outVal.isNull()) return false;
-          file <<"->" <<*arg->outVal <<"]";
-          std::map<int, FieldDescr>::const_iterator i = arg->fields.begin(),
-            e = arg->fields.end();
+        if (arg->pointee.doTraceValue) {
+          file <<"[" <<*arg->pointee.inVal;
+          if (arg->pointee.outVal.isNull()) return false;
+          file <<"->" <<*arg->pointee.outVal <<"]";
+          std::map<int, FieldDescr>::const_iterator i =
+            arg->pointee.fields.begin(),
+            e = arg->pointee.fields.end();
           for (; i != e; ++i) {
             file <<"[" <<i->second.name <<":";
             if (i->second.doTraceValue) {
@@ -644,10 +645,11 @@ bool dumpCallInfo(const CallInfo& ci, llvm::raw_ostream& file) {
     if (ci.ret.isPtr) {
       file <<"&";
       if (ci.ret.funPtr == NULL) {
-        if (ci.ret.tracePointee) {
-          file <<"[" <<*ci.ret.val <<"]";
-          std::map<int, FieldDescr>::const_iterator i = ci.ret.fields.begin(),
-            e = ci.ret.fields.end();
+        if (ci.ret.pointee.doTraceValue) {
+          file <<"[" <<*ci.ret.pointee.outVal <<"]";
+          std::map<int, FieldDescr>::const_iterator
+            i = ci.ret.pointee.fields.begin(),
+            e = ci.ret.pointee.fields.end();
           for (; i != e; ++i) {
             file <<"[" <<i->second.name <<":";
             if (i->second.doTraceValue) {
@@ -668,22 +670,39 @@ bool dumpCallInfo(const CallInfo& ci, llvm::raw_ostream& file) {
   return true;
 }
 
+void dumpPointeeInSExpr(const FieldDescr& pointee,
+                        llvm::raw_ostream& file);
+
 void dumpFieldsInSExpr(const std::map<int, FieldDescr>& fields,
                        llvm::raw_ostream& file) {
   file <<"(break_down (";
   std::map<int, FieldDescr>::const_iterator i = fields.begin(),
     e = fields.end();
   for (; i != e; ++i) {
-    file <<"\n((fname \"" <<i->second.name <<"\") (value ((full (";
-    if (i->second.doTraceValue) {
-      file <<*i->second.inVal;
-    }
-    file << "))\n";
-    dumpFieldsInSExpr(i->second.fields, file);
-    file <<")) (addr " <<i->second.addr <<"))";
+    file <<"\n((fname \"" <<i->second.name <<"\") (value ";
+    dumpPointeeInSExpr(i->second, file);
+    file <<") (addr " <<i->second.addr <<"))";
   }
   file <<"))";
 }
+
+void dumpPointeeInSExpr(const FieldDescr& pointee,
+                        llvm::raw_ostream& file) {
+  file << "((full (";
+  if (pointee.doTraceValue) {
+    file <<*pointee.inVal;
+  }
+  file <<"))\n (sname (";
+  if (!pointee.type.empty()) {
+    file <<pointee.type;
+  }
+  file << "))\n";
+  dumpFieldsInSExpr(pointee.fields, file);
+  file <<")";
+}
+
+void dumpPointeeOutSExpr(const FieldDescr& pointee,
+                         llvm::raw_ostream& file);
 
 void dumpFieldsOutSExpr(const std::map<int, FieldDescr>& fields,
                         llvm::raw_ostream& file) {
@@ -691,15 +710,26 @@ void dumpFieldsOutSExpr(const std::map<int, FieldDescr>& fields,
   std::map<int, FieldDescr>::const_iterator i = fields.begin(),
     e = fields.end();
   for (; i != e; ++i) {
-    file <<"\n((fname \"" <<i->second.name <<"\") (value ((full (";
-    if (i->second.doTraceValue) {
-      file <<*i->second.outVal;
-    }
-    file << "))\n";
-    dumpFieldsOutSExpr(i->second.fields, file);
-    file <<")) (addr " <<i->second.addr <<" ))";
+    file <<"\n((fname \"" <<i->second.name <<"\") (value ";
+    dumpPointeeOutSExpr(i->second, file);
+    file <<") (addr " <<i->second.addr <<" ))";
   }
   file <<"))";
+}
+
+void dumpPointeeOutSExpr(const FieldDescr& pointee,
+                         llvm::raw_ostream& file) {
+  file <<"((full (";
+  if (pointee.doTraceValue) {
+    file <<*pointee.outVal;
+  }
+  file <<"))\n (sname (";
+  if (!pointee.type.empty()) {
+    file <<pointee.type;
+  }
+  file <<"))\n";
+  dumpFieldsOutSExpr(pointee.fields, file);
+  file <<")";
 }
 
 bool dumpCallArgSExpr(const CallArg *arg, llvm::raw_ostream& file) {
@@ -708,15 +738,15 @@ bool dumpCallArgSExpr(const CallArg *arg, llvm::raw_ostream& file) {
   file <<"(ptr ";
   if (arg->isPtr) {
     if (arg->funPtr == NULL) {
-      if (arg->tracePointee) {
+      if (arg->pointee.doTraceValue) {
         file <<"(Curioptr\n";
-        file <<"((before ((full ("<<*arg->val <<"))\n";
-        dumpFieldsInSExpr(arg->fields, file);
-        file <<"))\n";
-        if (arg->outVal.isNull()) return false;
-        file <<"(after ((full (" <<*arg->outVal <<"))\n";
-        dumpFieldsOutSExpr(arg->fields, file);
-        file <<"))))\n";
+        file <<"((before ";
+        dumpPointeeInSExpr(arg->pointee, file);
+        file <<")\n";
+        if (arg->pointee.outVal.isNull()) return false;
+        file <<"(after ";
+        dumpPointeeOutSExpr(arg->pointee, file);
+        file <<")))\n";
       } else {
         file <<"Apathptr";
       }
@@ -738,11 +768,10 @@ void dumpRetSExpr(const RetVal& ret, llvm::raw_ostream& file) {
     file <<"(ptr ";
     if (ret.isPtr) {
       if (ret.funPtr == NULL) {
-        if (ret.tracePointee) {
-          file <<"(Curioptr ((before ((full ()) (break_down ()))) (after ((full ("
-               <<*ret.val <<")) ";
-          dumpFieldsOutSExpr(ret.fields, file);
-          file <<"))))\n";
+        if (ret.pointee.doTraceValue) {
+          file <<"(Curioptr ((before ((full ()) (break_down ()))) (after ";
+          dumpPointeeOutSExpr(ret.pointee, file);
+          file <<")))\n";
         } else {
           file <<"Apathptr";
         }
@@ -762,21 +791,21 @@ bool dumpExtraPtrSExpr(const CallExtraPtr& cep, llvm::raw_ostream& file) {
   file <<"(ptee ";
   if (cep.accessibleIn) {
     if (cep.accessibleOut) {
-      file <<"(Changing (((full (" <<*cep.inVal <<"))\n";
-      dumpFieldsInSExpr(cep.fields, file);
-      file <<")\n" <<"((full (" <<*cep.outVal <<"))\n";
-      dumpFieldsOutSExpr(cep.fields, file);
-      file <<")))\n";
-    } else {
-      file <<"(Closing ((full (" <<*cep.inVal <<"))\n";
-      dumpFieldsInSExpr(cep.fields, file);
+      file <<"(Changing (";
+      dumpPointeeInSExpr(cep.pointee, file);
+      file <<"\n";
+      dumpPointeeOutSExpr(cep.pointee, file);
       file <<"))\n";
+    } else {
+      file <<"(Closing ";
+      dumpPointeeOutSExpr(cep.pointee, file);
+      file <<")\n";
     }
   } else {
     if (cep.accessibleOut) {
-      file <<"(Opening ((full (" <<*cep.outVal <<"))\n";
-      dumpFieldsOutSExpr(cep.fields, file);
-      file <<"))\n";
+      file <<"(Opening ";
+      dumpPointeeInSExpr(cep.pointee, file);
+      file <<")\n";
     } else {
       llvm::errs() <<"The extra pointer must be accessible either at "
                    <<"the beginning of a function, at its end or both.\n";
@@ -999,29 +1028,30 @@ void dumpCallGroup(const std::vector<CallInfo*> group, llvm::raw_ostream& file) 
       if (arg.funPtr != NULL) {
         file <<arg.funPtr->getName();
       } else {
-        file <<"[" <<arg.val <<"->";
+        file <<"[" <<arg.pointee.inVal <<"->";
         for (; gi != ge; ++gi) {
-          file <<*(**gi).args[argI].outVal <<"; ";
+          file <<*(**gi).args[argI].pointee.outVal <<"; ";
         }
         file <<"]";
         gi = group.begin();
-        unsigned numFields = arg.fields.size();
+        unsigned numFields = arg.pointee.fields.size();
         for (; gi != ge; ++gi) {
-          assert((**gi).args[argI].fields.size() == numFields &&
+          assert((**gi).args[argI].pointee.fields.size() == numFields &&
                  "Do not support variating the argument structure for different"
                  " calls of the same function.");
         }
         gi = group.begin();
-        std::map<int, FieldDescr>::const_iterator fi = arg.fields.begin(),
-          fe = arg.fields.end();
+        std::map<int, FieldDescr>::const_iterator
+          fi = arg.pointee.fields.begin(),
+          fe = arg.pointee.fields.end();
         for (; fi != fe; ++fi) {
           int fieldOffset = fi->first;
           const FieldDescr& descr = fi->second;
           file <<"[" <<descr.name <<":" <<*descr.inVal << "->";
           for (; gi != ge; ++gi) {
             std::map<int, FieldDescr>::const_iterator otherDescrI =
-              (**gi).args[argI].fields.find(fieldOffset);
-            assert(otherDescrI != (**gi).args[argI].fields.end() &&
+              (**gi).args[argI].pointee.fields.find(fieldOffset);
+            assert(otherDescrI != (**gi).args[argI].pointee.fields.end() &&
                    "The argument structure is different.");
             file <<*otherDescrI->second.outVal <<";";
           }
@@ -1060,19 +1090,20 @@ void dumpCallGroup(const std::vector<CallInfo*> group, llvm::raw_ostream& file) 
         gi = group.begin();
       } else {
         for (; gi != ge; ++gi) {
-          file <<*(**gi).ret.val <<";";
+          file <<*(**gi).ret.pointee.outVal <<";";
         }
         gi = group.begin();
-        std::map<int, FieldDescr>::const_iterator fi = ret.fields.begin(),
-          fe = ret.fields.end();
+        std::map<int, FieldDescr>::const_iterator
+          fi = ret.pointee.fields.begin(),
+          fe = ret.pointee.fields.end();
         for (; fi != fe; ++fi) {
           int fieldOffset = fi->first;
           const FieldDescr& descr = fi->second;
           file <<"[" <<descr.name <<":";
           for (; gi != ge; ++gi) {
             std::map<int, FieldDescr>::const_iterator otherDescrI =
-              (**gi).ret.fields.find(fieldOffset);
-            assert(otherDescrI != (**gi).ret.fields.end() &&
+              (**gi).ret.pointee.fields.find(fieldOffset);
+            assert(otherDescrI != (**gi).ret.pointee.fields.end() &&
                    "The return structure is different.");
             file <<*otherDescrI->second.outVal <<";";
           }
