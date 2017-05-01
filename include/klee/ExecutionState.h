@@ -323,6 +323,7 @@ public:
   void traceArgValue(ref<Expr> val, std::string name);
   void traceArgPtr(ref<Expr> arg, Expr::Width width,
                    std::string name,
+                   std::string type,
                    bool tracePointee);
   void traceArgFunPtr(ref<Expr> arg,
                       std::string name);

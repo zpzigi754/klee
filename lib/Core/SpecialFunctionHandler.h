@@ -139,6 +139,7 @@ namespace klee {
     HANDLER(handleDivRemOverflow);
     HANDLER(handleTraceParam);
     HANDLER(handleTraceParamPtr);
+    HANDLER(handleTraceParamTaggedPtr);
     HANDLER(handleTraceParamJustPtr);
     HANDLER(handleTraceParamFPtr);
     HANDLER(handleTraceRet);
