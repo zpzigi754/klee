@@ -1282,6 +1282,18 @@ bool klee::updateDiffMask(StateByteMask* mask,
     const ObjectState *refOs = i->second;
     const ObjectState *os = state.addressSpace.findObject(obj);
     if (refOs == os) continue;
+    if (refOs->isAccessible() != os->isAccessible()) {
+      std::string inacc_msg;
+      if (refOs->isAccessible()) {
+        inacc_msg = "cand " + os->inaccessible_message;
+      } else {
+        inacc_msg = "ref " + refOs->inaccessible_message;
+      }
+      printf("No support for accessibility alternation "
+             "between loop iterations. Inaccessibility reason: %s\n",
+             inacc_msg.c_str());
+      exit(1);
+    }
     assert(refOs->isAccessible() == os->isAccessible() &&
            "No support for accessibility alteration "
            "between loop iterations.");
