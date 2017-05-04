@@ -170,6 +170,15 @@ extern "C" {
   KLEE_TRACE_PARAM_PROTO(_i64, int64_t);
 #undef KLEE_TRACE_PARAM_PROTO
   void klee_trace_param_ptr(void* ptr, int width, const char* name);
+  typedef enum TracingDirection {
+    TD_NONE= 0,
+    TD_IN = 1,
+    TD_OUT = 2,
+    TD_BOTH = 3
+  } TracingDirection;
+  void klee_trace_param_ptr_directed(void* ptr, int width,
+                                     const char* name,
+                                     TracingDirection td);
   void klee_trace_param_tagged_ptr(void* ptr, int width,
                                    const char* name, const char* type);
   void klee_trace_param_just_ptr(void* ptr, int width, const char* name);
@@ -179,6 +188,9 @@ extern "C" {
   void klee_trace_ret_just_ptr(int width);
 
   void klee_trace_param_ptr_field(void* ptr, int offset, int width, char* name);
+  void klee_trace_param_ptr_field_directed(void* ptr, int offset,
+                                           int width, char* name,
+                                           TracingDirection td);
   void klee_trace_param_ptr_field_just_ptr(void* ptr, int offset,
                                            int width, char* name);
   void klee_trace_ret_ptr_field(int offset, int width, char* name);
