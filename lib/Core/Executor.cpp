@@ -1489,7 +1489,7 @@ void dumpFields(std::map<int, klee::FieldDescr>* fields, size_t base,
     ref<klee::ConstantExpr> addrExpr =
       klee::ConstantExpr::alloc(base + offset,
                                 sizeof(size_t)*8);
-    if (i->second.doTraceValue)
+    if (i->second.doTraceValueOut)
       i->second.outVal = state.readMemoryChunk(addrExpr, i->second.width,
                                                true);
     if (i->second.addr == 0)
@@ -1517,7 +1517,7 @@ void klee::FillCallInfoOutput(Function* f,
   if (!isVoidReturn) {
     info->ret.expr = result;
     info->ret.isPtr = retType->isPointerTy();
-    if (info->ret.isPtr && info->ret.pointee.doTraceValue) {
+    if (info->ret.isPtr && info->ret.pointee.doTraceValueOut) {
       llvm::Type *elementType = (cast<PointerType>(retType))->
         getElementType();
       assert(isa<klee::ConstantExpr>(result) &&
@@ -1565,7 +1565,8 @@ void klee::FillCallInfoOutput(Function* f,
   int numParams = info->args.size();
   for (int i = 0; i < numParams; ++i) {
     CallArg *arg = &info->args[i];
-    if (arg->isPtr && arg->pointee.doTraceValue && arg->funPtr == NULL) {
+    if (arg->isPtr && arg->pointee.doTraceValueOut
+        && arg->funPtr == NULL) {
       info->args[i].pointee.outVal =
         state.readMemoryChunk(arg->expr,
                               arg->pointee.width,

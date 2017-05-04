@@ -584,19 +584,35 @@ bool dumpCallInfo(const CallInfo& ci, llvm::raw_ostream& file) {
     if (arg->isPtr) {
       file <<"&";
       if (arg->funPtr == NULL) {
-        if (arg->pointee.doTraceValue) {
-          file <<"[" <<*arg->pointee.inVal;
-          if (arg->pointee.outVal.isNull()) return false;
-          file <<"->" <<*arg->pointee.outVal <<"]";
+        if (arg->pointee.doTraceValueIn ||
+            arg->pointee.doTraceValueOut) {
+          file <<"[";
+          if (arg->pointee.doTraceValueIn) {
+            file <<*arg->pointee.inVal;
+          }
+          if (arg->pointee.doTraceValueOut &&
+              arg->pointee.outVal.isNull()) return false;
+          file <<"->";
+          if (arg->pointee.doTraceValueOut) {
+            file <<*arg->pointee.outVal <<"]";
+          }
           std::map<int, FieldDescr>::const_iterator i =
             arg->pointee.fields.begin(),
             e = arg->pointee.fields.end();
           for (; i != e; ++i) {
             file <<"[" <<i->second.name <<":";
-            if (i->second.doTraceValue) {
-              file <<*i->second.inVal << "->";
-              if (i->second.outVal.isNull()) return false;
-              file <<*i->second.outVal <<"]";
+            if (i->second.doTraceValueIn ||
+                i->second.doTraceValueOut) {
+              if (i->second.doTraceValueIn) {
+                file <<*i->second.inVal;
+              }
+              file << "->";
+              if (i->second.doTraceValueOut &&
+                  i->second.outVal.isNull()) return false;
+              if (i->second.doTraceValueOut) {
+                file <<*i->second.outVal;
+              }
+              file <<"]";
             } else {
               file <<"(...)]";
             }
@@ -619,14 +635,14 @@ bool dumpCallInfo(const CallInfo& ci, llvm::raw_ostream& file) {
     if (ci.ret.isPtr) {
       file <<"&";
       if (ci.ret.funPtr == NULL) {
-        if (ci.ret.pointee.doTraceValue) {
+        if (ci.ret.pointee.doTraceValueOut) {
           file <<"[" <<*ci.ret.pointee.outVal <<"]";
           std::map<int, FieldDescr>::const_iterator
             i = ci.ret.pointee.fields.begin(),
             e = ci.ret.pointee.fields.end();
           for (; i != e; ++i) {
             file <<"[" <<i->second.name <<":";
-            if (i->second.doTraceValue) {
+            if (i->second.doTraceValueOut) {
               file <<*i->second.outVal << "]";
             } else {
               file <<"(...)]";
@@ -663,7 +679,7 @@ void dumpFieldsInSExpr(const std::map<int, FieldDescr>& fields,
 void dumpPointeeInSExpr(const FieldDescr& pointee,
                         llvm::raw_ostream& file) {
   file << "((full (";
-  if (pointee.doTraceValue) {
+  if (pointee.doTraceValueIn) {
     file <<*pointee.inVal;
   }
   file <<"))\n (sname (";
@@ -694,7 +710,7 @@ void dumpFieldsOutSExpr(const std::map<int, FieldDescr>& fields,
 void dumpPointeeOutSExpr(const FieldDescr& pointee,
                          llvm::raw_ostream& file) {
   file <<"((full (";
-  if (pointee.doTraceValue) {
+  if (pointee.doTraceValueOut) {
     file <<*pointee.outVal;
   }
   file <<"))\n (sname (";
@@ -712,12 +728,12 @@ bool dumpCallArgSExpr(const CallArg *arg, llvm::raw_ostream& file) {
   file <<"(ptr ";
   if (arg->isPtr) {
     if (arg->funPtr == NULL) {
-      if (arg->pointee.doTraceValue) {
+      if (arg->pointee.doTraceValueIn ||
+          arg->pointee.doTraceValueOut) {
         file <<"(Curioptr\n";
         file <<"((before ";
         dumpPointeeInSExpr(arg->pointee, file);
         file <<")\n";
-        if (arg->pointee.outVal.isNull()) return false;
         file <<"(after ";
         dumpPointeeOutSExpr(arg->pointee, file);
         file <<")))\n";
@@ -742,7 +758,8 @@ void dumpRetSExpr(const RetVal& ret, llvm::raw_ostream& file) {
     file <<"(ptr ";
     if (ret.isPtr) {
       if (ret.funPtr == NULL) {
-        if (ret.pointee.doTraceValue) {
+        if (ret.pointee.doTraceValueIn ||
+            ret.pointee.doTraceValueOut) {
           file <<"(Curioptr ((before ((full ()) (break_down ()))) (after ";
           dumpPointeeOutSExpr(ret.pointee, file);
           file <<")))\n";

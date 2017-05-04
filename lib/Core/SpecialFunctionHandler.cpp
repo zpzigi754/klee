@@ -120,6 +120,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_trace_param_i32", handleTraceParam, false),
   add("klee_trace_param_i64", handleTraceParam, false),
   add("klee_trace_param_ptr", handleTraceParamPtr, false),
+  add("klee_trace_param_ptr_directed", handleTraceParamPtrDirected, false),
   add("klee_trace_param_tagged_ptr", handleTraceParamTaggedPtr, false),
   add("klee_trace_param_just_ptr", handleTraceParamJustPtr, false),
   add("klee_trace_param_fptr", handleTraceParamFPtr, false),
@@ -127,6 +128,8 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_trace_ret_ptr", handleTraceRetPtr, false),
   add("klee_trace_ret_just_ptr", handleTraceRetJustPtr, false),
   add("klee_trace_param_ptr_field", handleTraceParamPtrField, false),
+  add("klee_trace_param_ptr_field_directed",
+      handleTraceParamPtrFieldDirected, false),
   add("klee_trace_param_ptr_field_just_ptr",
       handleTraceParamPtrFieldJustPtr, false),
   add("klee_trace_ret_ptr_field", handleTraceRetPtrField, false),
@@ -990,7 +993,31 @@ void SpecialFunctionHandler::handleTraceParamPtrField(ExecutionState &state,
   Expr::Width width = (cast<klee::ConstantExpr>(arguments[2]))->getZExtValue();
   std::string name = readStringAtAddress(state, arguments[3]);
   width = width * 8;//Convert to bits.
-  state.traceArgPtrField(arguments[0], offset, width, name, true);
+  state.traceArgPtrField(arguments[0], offset, width, name, true, true);
+}
+
+void SpecialFunctionHandler::handleTraceParamPtrFieldDirected(ExecutionState &state,
+                                                              KInstruction *target,
+                                                              std::vector<ref<Expr> >
+                                                              &arguments) {
+  int offset = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
+  Expr::Width width = (cast<klee::ConstantExpr>(arguments[2]))->getZExtValue();
+  std::string name = readStringAtAddress(state, arguments[3]);
+  width = width * 8;//Convert to bits.
+  size_t direction = (cast<klee::ConstantExpr>(arguments[4]))->getZExtValue();
+  bool trace_in = false, trace_out = false;
+  switch(direction) {
+  case 0: trace_in = false; trace_out = false; break;
+  case 1: trace_in = true;  trace_out = false; break;
+  case 2: trace_in = false; trace_out = true; break;
+  case 3: trace_in = true;  trace_out = true; break;
+  default:
+    executor.terminateStateOnError
+      (state, "Unrecognized tracing direction",
+       Executor::User);
+    return;
+  }
+  state.traceArgPtrField(arguments[0], offset, width, name, trace_in, trace_out);
 }
 
 void SpecialFunctionHandler::handleTraceExtraPtrField(ExecutionState &state,
@@ -1057,7 +1084,7 @@ void SpecialFunctionHandler::handleTraceParamPtrFieldJustPtr
   Expr::Width width = (cast<klee::ConstantExpr>(arguments[2]))->getZExtValue();
   std::string name = readStringAtAddress(state, arguments[3]);
   width = width * 8;//Convert to bits.
-  state.traceArgPtrField(arguments[0], offset, width, name, false);
+  state.traceArgPtrField(arguments[0], offset, width, name, false, false);
 }
 
 void SpecialFunctionHandler::handleTraceParam(ExecutionState &state,
@@ -1081,7 +1108,7 @@ void SpecialFunctionHandler::handleTraceParamTaggedPtr(ExecutionState &state,
   width = width * 8;//Convert to bits.
   std::string name = readStringAtAddress(state, arguments[2]);
   std::string type = readStringAtAddress(state, arguments[3]);
-  state.traceArgPtr(arguments[0], width, name, type, true);
+  state.traceArgPtr(arguments[0], width, name, type, true, true);
 }
 
 void SpecialFunctionHandler::handleTraceParamPtr(ExecutionState &state,
@@ -1092,8 +1119,44 @@ void SpecialFunctionHandler::handleTraceParamPtr(ExecutionState &state,
   Expr::Width width = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
   width = width * 8;//Convert to bits.
   std::string name = readStringAtAddress(state, arguments[2]);
-  state.traceArgPtr(arguments[0], width, name, "", true);
+  state.traceArgPtr(arguments[0], width, name, "", true, true);
 }
+
+void SpecialFunctionHandler::handleTraceParamPtrDirected(ExecutionState &state,
+                                                         KInstruction *target,
+                                                         std::vector<ref<Expr> >
+                                                         &arguments) {
+  if (!isa<klee::ConstantExpr>(arguments[1])) {
+    executor.terminateStateOnError
+      (state, "Width must be a static constant.",
+       Executor::User);
+    return;
+  }
+  if (!isa<klee::ConstantExpr>(arguments[3])) {
+    executor.terminateStateOnError
+      (state, "Direction must be a static constant.",
+       Executor::User);
+    return;
+  }
+  Expr::Width width = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
+  width = width * 8;//Convert to bits.
+  std::string name = readStringAtAddress(state, arguments[2]);
+  size_t direction = (cast<klee::ConstantExpr>(arguments[3]))->getZExtValue();
+  bool trace_in = false, trace_out = false;
+  switch(direction) {
+  case 0: trace_in = false; trace_out = false; break;
+  case 1: trace_in = true;  trace_out = false; break;
+  case 2: trace_in = false; trace_out = true; break;
+  case 3: trace_in = true;  trace_out = true; break;
+  default:
+    executor.terminateStateOnError
+      (state, "Unrecognized tracing direction",
+       Executor::User);
+    return;
+  }
+  state.traceArgPtr(arguments[0], width, name, "", trace_in, trace_out);
+}
+
 
 void SpecialFunctionHandler::handleTraceParamJustPtr(ExecutionState &state,
                                                      KInstruction *target,
@@ -1108,7 +1171,7 @@ void SpecialFunctionHandler::handleTraceParamJustPtr(ExecutionState &state,
   Expr::Width width = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
   width = width * 8;//Convert to bits.
   std::string name = readStringAtAddress(state, arguments[2]);
-  state.traceArgPtr(arguments[0], width, name, "", false);
+  state.traceArgPtr(arguments[0], width, name, "", false, false);
 }
 
 void SpecialFunctionHandler::handleTraceParamFPtr(ExecutionState &state,
