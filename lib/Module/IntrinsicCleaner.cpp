@@ -258,8 +258,10 @@ bool IntrinsicCleanerPass::runOnBasicBlock(BasicBlock &b, Module &M) {
         dirty = true;
         break;
       }
-      // consistency fence, just ignore it
-      case Intrinsic::x86_sse_sfence: {
+      // consistency fences, just ignore them
+      case Intrinsic::x86_sse_sfence:
+      case Intrinsic::x86_sse2_lfence:
+      case Intrinsic::x86_sse2_mfence: {
         ii->eraseFromParent();
         dirty = true;
         break;
