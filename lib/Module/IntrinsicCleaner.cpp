@@ -250,7 +250,7 @@ bool IntrinsicCleanerPass::runOnBasicBlock(BasicBlock &b, Module &M) {
         assert(dst && "Failed to get first argument");
         Value *src = ii->getArgOperand(1);
         assert(src && "Failed to get second argument");
-        LLVM_TYPE_Q VectorType* vecType = cast<VectorType>(src->getType());
+        VectorType* vecType = cast<VectorType>(src->getType());
         PointerType *vecPointerType = PointerType::get(vecType, 0);
         CastInst* cast = new BitCastInst(dst, vecPointerType, "", ii);
         new StoreInst(src, cast, false, ii);
