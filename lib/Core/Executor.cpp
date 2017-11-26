@@ -3642,13 +3642,13 @@ void Executor::executeMemoryOperation(ExecutionState &state,
           ref<Expr> result = os->read(mo->getOffsetExpr(address), type);
           bindLocal(target, *bound, result);
         }
+      } else {
+        std::stringstream msg;
+        msg << "memory error: object inaccessible. ";
+        msg << "It is rendered inaccessible because: ";
+        msg << os->inaccessible_message;
+        terminateStateOnError(state, msg.str(), Inaccessible);
       }
-    } else {
-      std::stringstream msg;
-      msg << "memory error: object inaccessible. ";
-      msg << "It is rendered inaccessible because: ";
-      msg << os->inaccessible_message;
-      terminateStateOnError(state, msg.str(), Inaccessible);
     }
 
     unbound = branches.second;
