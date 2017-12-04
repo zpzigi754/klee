@@ -701,8 +701,7 @@ void ExecutionState::traceExtraPtrNestedNestedField(size_t ptr,
 
 void ExecutionState::traceExtraPtr(size_t ptr, Expr::Width width,
                                    std::string name,
-                                   std::string type,
-                                   bool tracePointee) {
+                                   std::string type) {
   traceRet();
   callPath.back().extraPtrs.
     insert(std::pair<const size_t, CallExtraPtr>(ptr, CallExtraPtr()));

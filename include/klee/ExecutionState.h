@@ -347,8 +347,7 @@ public:
                               Expr::Width width, std::string name);
   void traceExtraPtr(size_t ptr, Expr::Width width,
                      std::string name,
-                     std::string type,
-                     bool tracePointee);
+                     std::string type);
   void traceExtraPtrField(size_t ptr, int offset,
                           Expr::Width width, std::string name,
                           bool doTraceValue);

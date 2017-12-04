@@ -970,7 +970,7 @@ void SpecialFunctionHandler::handleTraceExtraPtr(ExecutionState &state,
   std::string name = readStringAtAddress(state, arguments[2]);
   std::string type = readStringAtAddress(state, arguments[3]);
   size_t ptr = (cast<ConstantExpr>(arguments[0]))->getZExtValue();
-  state.traceExtraPtr(ptr, width, name, type, true);
+  state.traceExtraPtr(ptr, width, name, type);
 }
 
 
