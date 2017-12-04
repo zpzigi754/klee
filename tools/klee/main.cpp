@@ -710,7 +710,7 @@ void dumpFieldsOutSExpr(const std::map<int, FieldDescr>& fields,
 void dumpPointeeOutSExpr(const FieldDescr& pointee,
                          llvm::raw_ostream& file) {
   file <<"((full (";
-  if (pointee.doTraceValueOut && !pointee.outVal.isNull()) {
+  if (pointee.doTraceValueOut) {
     file <<*pointee.outVal;
   }
   file <<"))\n (sname (";
