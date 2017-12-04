@@ -347,23 +347,24 @@ public:
                               Expr::Width width, std::string name);
   void traceExtraPtr(size_t ptr, Expr::Width width,
                      std::string name,
-                     std::string type);
+                     std::string type,
+                     bool trace_in, bool trace_out);
   void traceExtraPtrField(size_t ptr, int offset,
                           Expr::Width width, std::string name,
-                          bool doTraceValue);
+                          bool trace_in, bool trace_out);
   void traceExtraPtrNestedField(size_t ptr,
                                 int base_offset,
                                 int offset,
                                 Expr::Width width,
                                 std::string name,
-                                bool doTraceValue);
+                                bool trace_in, bool trace_out);
   void traceExtraPtrNestedNestedField(size_t ptr,
                                       int base_base_offset,
                                       int base_offset,
                                       int offset,
                                       Expr::Width width,
-                                                      std::string name,
-                                      bool doTraceValue);
+                                      std::string name,
+                                      bool trace_in, bool trace_out);
   void traceRetPtrField(int offset, Expr::Width width, std::string name,
                         bool doTraceValue);
   void traceRetPtrNestedField(int base_offset, int offset,
