@@ -625,7 +625,7 @@ void ExecutionState::traceExtraPtrNestedField(size_t ptr,
                                               int offset,
                                               Expr::Width width,
                                               std::string name,
-                                              bool doTraceValue) {
+                                              bool trace_in, bool trace_out) {
   assert(!callPath.empty() &&
          callPath.back().f == stack.back().kf->function &&
          "Must trace the function first to trace a particular field.");
@@ -642,14 +642,14 @@ void ExecutionState::traceExtraPtrNestedField(size_t ptr,
   descr.width = width;
   descr.name = name;
   size_t base = ptr;
-  if (doTraceValue) {
+  if (trace_in) {
     ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + base_offset + offset,
                                                      sizeof(size_t)*8);
     descr.inVal = readMemoryChunk(addrExpr, width, true);
   }
   descr.addr = base + base_offset + offset;
-  descr.doTraceValueIn = doTraceValue;
-  descr.doTraceValueOut = doTraceValue;
+  descr.doTraceValueIn = trace_in;
+  descr.doTraceValueOut = trace_out;
   extraPtr->pointee.fields[base_offset].fields[offset] = descr;
 }
 
@@ -659,7 +659,7 @@ void ExecutionState::traceExtraPtrNestedNestedField(size_t ptr,
                                                     int offset,
                                                     Expr::Width width,
                                                     std::string name,
-                                                    bool doTraceValue) {
+                                                    bool trace_in, bool trace_out) {
   assert(!callPath.empty() &&
          callPath.back().f == stack.back().kf->function &&
          "Must trace the function first to trace a particular field.");
@@ -685,13 +685,13 @@ void ExecutionState::traceExtraPtrNestedNestedField(size_t ptr,
   descr.name = name;
   size_t base = ptr;
   descr.addr = base + base_base_offset + base_offset + offset;
-  if (doTraceValue) {
+  if (trace_in) {
     ref<ConstantExpr> addrExpr = ConstantExpr::alloc(descr.addr,
                                                      sizeof(size_t)*8);
     descr.inVal = readMemoryChunk(addrExpr, width, true);
   }
-  descr.doTraceValueIn = doTraceValue;
-  descr.doTraceValueOut = doTraceValue;
+  descr.doTraceValueIn = trace_in;
+  descr.doTraceValueOut = trace_out;
   extraPtr->pointee.
     fields[base_base_offset].
     fields[base_offset].
@@ -701,7 +701,8 @@ void ExecutionState::traceExtraPtrNestedNestedField(size_t ptr,
 
 void ExecutionState::traceExtraPtr(size_t ptr, Expr::Width width,
                                    std::string name,
-                                   std::string type) {
+                                   std::string type,
+                                   bool trace_in, bool trace_out) {
   traceRet();
   callPath.back().extraPtrs.
     insert(std::pair<const size_t, CallExtraPtr>(ptr, CallExtraPtr()));
@@ -710,12 +711,18 @@ void ExecutionState::traceExtraPtr(size_t ptr, Expr::Width width,
   extraPtr->name = name;
   extraPtr->pointee.width = width;
   extraPtr->pointee.type = type;
-  extraPtr->pointee.inVal =
-    constraints.simplifyExpr
-    (readMemoryChunk(ConstantExpr::alloc(ptr, sizeof(size_t)*8), width, true));
-  extraPtr->accessibleIn =
-    isAccessibleAddr(ConstantExpr::alloc(ptr, 8*sizeof(size_t)));
-  SymbolSet indirectSymbols = GetExprSymbols::visit(extraPtr->pointee.inVal);
+  extraPtr->pointee.doTraceValueIn = trace_in;
+  extraPtr->pointee.doTraceValueOut = trace_out;
+
+  SymbolSet indirectSymbols;
+  if (trace_in) {
+    extraPtr->pointee.inVal =
+      constraints.simplifyExpr
+      (readMemoryChunk(ConstantExpr::alloc(ptr, sizeof(size_t)*8), width, true));
+    extraPtr->accessibleIn =
+      isAccessibleAddr(ConstantExpr::alloc(ptr, 8*sizeof(size_t)));
+    indirectSymbols = GetExprSymbols::visit(extraPtr->pointee.inVal);
+  }
   std::vector<ref<Expr> > constrs = relevantConstraints(indirectSymbols);
   callPath.back().callContext.insert(callPath.back().callContext.end(),
                                      constrs.begin(), constrs.end());
@@ -725,7 +732,7 @@ void ExecutionState::traceExtraPtrField(size_t ptr,
                                         int offset,
                                         Expr::Width width,
                                         std::string name,
-                                        bool doTraceValue) {
+                                        bool trace_in, bool trace_out) {
   assert(!callPath.empty() &&
          callPath.back().f == stack.back().kf->function &&
          "Must trace the function first to trace a particular field.");
@@ -736,14 +743,14 @@ void ExecutionState::traceExtraPtrField(size_t ptr,
   descr.width = width;
   descr.name = name;
   size_t base = ptr;
-  if (doTraceValue) {
+  if (trace_in) {
     ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + offset,
                                                      sizeof(size_t)*8);
     descr.inVal = readMemoryChunk(addrExpr, width, true);
   }
   descr.addr = base + offset;
-  descr.doTraceValueIn = doTraceValue;
-  descr.doTraceValueOut = doTraceValue;
+  descr.doTraceValueIn = trace_in;
+  descr.doTraceValueOut = trace_out;
   extraPtr->pointee.fields[offset] = descr;
 }
 

@@ -969,8 +969,23 @@ void SpecialFunctionHandler::handleTraceExtraPtr(ExecutionState &state,
   width = width * 8;//Convert to bits.
   std::string name = readStringAtAddress(state, arguments[2]);
   std::string type = readStringAtAddress(state, arguments[3]);
+
+  bool trace_in = true, trace_out = true;
+  size_t direction = (cast<klee::ConstantExpr>(arguments[4]))->getZExtValue();
+  switch(direction) {
+    case 0: trace_in = false; trace_out = false; break;
+    case 1: trace_in = true;  trace_out = false; break;
+    case 2: trace_in = false; trace_out = true; break;
+    case 3: trace_in = true;  trace_out = true; break;
+    default:
+      executor.terminateStateOnError
+        (state, "Unrecognized tracing direction",
+        Executor::User);
+      return;
+  }
+
   size_t ptr = (cast<ConstantExpr>(arguments[0]))->getZExtValue();
-  state.traceExtraPtr(ptr, width, name, type);
+  state.traceExtraPtr(ptr, width, name, type, trace_in, trace_out);
 }
 
 
@@ -1008,15 +1023,15 @@ void SpecialFunctionHandler::handleTraceParamPtrFieldDirected(ExecutionState &st
   size_t direction = (cast<klee::ConstantExpr>(arguments[4]))->getZExtValue();
   bool trace_in = false, trace_out = false;
   switch(direction) {
-  case 0: trace_in = false; trace_out = false; break;
-  case 1: trace_in = true;  trace_out = false; break;
-  case 2: trace_in = false; trace_out = true; break;
-  case 3: trace_in = true;  trace_out = true; break;
-  default:
-    executor.terminateStateOnError
-      (state, "Unrecognized tracing direction",
-       Executor::User);
-    return;
+    case 0: trace_in = false; trace_out = false; break;
+    case 1: trace_in = true;  trace_out = false; break;
+    case 2: trace_in = false; trace_out = true; break;
+    case 3: trace_in = true;  trace_out = true; break;
+    default:
+      executor.terminateStateOnError
+        (state, "Unrecognized tracing direction",
+         Executor::User);
+      return;
   }
   state.traceArgPtrField(arguments[0], offset, width, name, trace_in, trace_out);
 }
@@ -1030,7 +1045,22 @@ void SpecialFunctionHandler::handleTraceExtraPtrField(ExecutionState &state,
   std::string name = readStringAtAddress(state, arguments[3]);
   width = width * 8;//Convert to bits.
   size_t ptr = (cast<ConstantExpr>(arguments[0]))->getZExtValue();
-  state.traceExtraPtrField(ptr, offset, width, name, true);
+
+  bool trace_in = true, trace_out = true;
+  size_t direction = (cast<klee::ConstantExpr>(arguments[4]))->getZExtValue();
+  switch(direction) {
+    case 0: trace_in = false; trace_out = false; break;
+    case 1: trace_in = true;  trace_out = false; break;
+    case 2: trace_in = false; trace_out = true; break;
+    case 3: trace_in = true;  trace_out = true; break;
+    default:
+      executor.terminateStateOnError
+        (state, "Unrecognized tracing direction",
+        Executor::User);
+      return;
+  }
+
+  state.traceExtraPtrField(ptr, offset, width, name, trace_in, trace_out);
 }
 
 void SpecialFunctionHandler::handleTraceExtraPtrNestedField
@@ -1044,7 +1074,22 @@ void SpecialFunctionHandler::handleTraceExtraPtrNestedField
   Expr::Width width = (cast<klee::ConstantExpr>(arguments[3]))->getZExtValue();
   std::string name = readStringAtAddress(state, arguments[4]);
   width = width * 8;//Convert to bits.
-  state.traceExtraPtrNestedField(ptr, base_offset, offset, width, name, true);
+
+  bool trace_in = true, trace_out = true;
+  size_t direction = (cast<klee::ConstantExpr>(arguments[5]))->getZExtValue();
+  switch(direction) {
+    case 0: trace_in = false; trace_out = false; break;
+    case 1: trace_in = true;  trace_out = false; break;
+    case 2: trace_in = false; trace_out = true; break;
+    case 3: trace_in = true;  trace_out = true; break;
+    default:
+      executor.terminateStateOnError
+        (state, "Unrecognized tracing direction",
+        Executor::User);
+      return;
+  }
+
+  state.traceExtraPtrNestedField(ptr, base_offset, offset, width, name, trace_in, trace_out);
 }
 
 void SpecialFunctionHandler::handleTraceExtraPtrNestedNestedField
@@ -1059,8 +1104,23 @@ void SpecialFunctionHandler::handleTraceExtraPtrNestedNestedField
   Expr::Width width = (cast<klee::ConstantExpr>(arguments[4]))->getZExtValue();
   std::string name = readStringAtAddress(state, arguments[5]);
   width = width * 8;//Convert to bits.
+
+  bool trace_in = true, trace_out = true;
+  size_t direction = (cast<klee::ConstantExpr>(arguments[6]))->getZExtValue();
+  switch(direction) {
+    case 0: trace_in = false; trace_out = false; break;
+    case 1: trace_in = true;  trace_out = false; break;
+    case 2: trace_in = false; trace_out = true; break;
+    case 3: trace_in = true;  trace_out = true; break;
+    default:
+      executor.terminateStateOnError
+        (state, "Unrecognized tracing direction",
+        Executor::User);
+      return;
+  }
+
   state.traceExtraPtrNestedNestedField(ptr, base_base_offset,
-                                       base_offset, offset, width, name, true);
+                                       base_offset, offset, width, name, trace_in, trace_out);
 }
 
 void SpecialFunctionHandler::handleTraceExtraPtrFieldJustPtr
@@ -1073,7 +1133,7 @@ void SpecialFunctionHandler::handleTraceExtraPtrFieldJustPtr
   std::string name = readStringAtAddress(state, arguments[3]);
   width = width * 8;//Convert to bits.
   size_t ptr = (cast<ConstantExpr>(arguments[0]))->getZExtValue();
-  state.traceExtraPtrField(ptr, offset, width, name, false);
+  state.traceExtraPtrField(ptr, offset, width, name, false, false);
 }
 
 void SpecialFunctionHandler::handleTraceParamPtrFieldJustPtr
