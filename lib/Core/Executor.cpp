@@ -1610,10 +1610,12 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       result = eval(ki, 0, state).value;
     }
 
+    // HACK: This assumes the last function in the call path that corresponds is the right one;
+    // this will not work if trace_ret is not always called!
     Function* f = ri->getParent()->getParent();
-    if (!state.callPath.empty() && f == state.callPath.back().f) {
-      CallInfo *info = &state.callPath.back();
-      FillCallInfoOutput(f, isVoidReturn, result, state, *this, info);
+    auto cicand = std::find_if(state.callPath.rbegin(), state.callPath.rend(), [&f](const CallInfo& ci) { return ci.f == f; });
+    if (!state.callPath.empty() && cicand != state.callPath.rend()) {
+      FillCallInfoOutput(f, isVoidReturn, result, state, *this, &(*cicand));
     }
     if (state.stack.size() <= 1) {
       assert(!caller && "caller set on initial stack frame");
