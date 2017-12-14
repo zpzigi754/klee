@@ -713,14 +713,14 @@ void ExecutionState::traceExtraPtr(size_t ptr, Expr::Width width,
   extraPtr->pointee.type = type;
   extraPtr->pointee.doTraceValueIn = trace_in;
   extraPtr->pointee.doTraceValueOut = trace_out;
+  extraPtr->accessibleIn =
+    isAccessibleAddr(ConstantExpr::alloc(ptr, 8*sizeof(size_t)));
 
   SymbolSet indirectSymbols;
   if (trace_in) {
     extraPtr->pointee.inVal =
       constraints.simplifyExpr
       (readMemoryChunk(ConstantExpr::alloc(ptr, sizeof(size_t)*8), width, true));
-    extraPtr->accessibleIn =
-      isAccessibleAddr(ConstantExpr::alloc(ptr, 8*sizeof(size_t)));
     indirectSymbols = GetExprSymbols::visit(extraPtr->pointee.inVal);
   }
   std::vector<ref<Expr> > constrs = relevantConstraints(indirectSymbols);
