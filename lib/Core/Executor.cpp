@@ -1567,7 +1567,7 @@ void klee::FillCallInfoOutput(Function* f,
     CallArg *arg = &info->args[i];
     if (arg->isPtr && arg->pointee.doTraceValueOut
         && arg->funPtr == NULL) {
-      info->args[i].pointee.outVal =
+      arg->pointee.outVal =
         state.readMemoryChunk(arg->expr,
                               arg->pointee.width,
                               true);
