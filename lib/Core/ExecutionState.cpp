@@ -1175,19 +1175,20 @@ bool CallInfo::eq(const CallInfo& other) const {
 bool CallInfo::sameInvocation(const CallInfo* other) const {
   //TODO: compare assumptions as well.
   if (args.size() != other->args.size()) return false;
-  if (extraPtrs.size() != other->extraPtrs.size()) return false;
+  // HACK: Not comparing extra ptrs for now, since depending on result value an extra ptr may exist or not
+  //if (extraPtrs.size() != other->extraPtrs.size()) return false;
   if (f != other->f) return false;
   for (unsigned i = 0; i < args.size(); ++i) {
     if (!args[i].sameInvocationValue(other->args[i])) return false;
   }
-  std::map<size_t, CallExtraPtr>::const_iterator i = extraPtrs.begin(),
+  /*std::map<size_t, CallExtraPtr>::const_iterator i = extraPtrs.begin(),
     e = extraPtrs.end();
   for (; i != e; ++i) {
     std::map<size_t, CallExtraPtr>::const_iterator it =
       other->extraPtrs.find(i->first);
     if (it == other->extraPtrs.end() ||
         !it->second.sameInvocationValue(i->second)) return false;
-  }
+  }*/
   return equalContexts(callContext, other->callContext);
 }
 
