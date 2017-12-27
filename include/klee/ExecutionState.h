@@ -344,7 +344,8 @@ public:
                         bool doTraceValueIn,
                         bool doTraceValueOut);
   void traceArgPtrNestedField(ref<Expr> arg, int base_offset, int offset,
-                              Expr::Width width, std::string name);
+                              Expr::Width width, std::string name,
+                              bool trace_in, bool trace_out);
   void traceExtraPtr(size_t ptr, Expr::Width width,
                      std::string name,
                      std::string type,

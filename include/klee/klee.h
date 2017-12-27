@@ -204,6 +204,9 @@ extern "C" {
   void klee_trace_ret_ptr_field_just_ptr(int offset, int width, char* name);
   void klee_trace_param_ptr_nested_field(void* ptr, int base_offset,
                                          int offset, int width, char* name);
+  void klee_trace_param_ptr_nested_field_directed(void* ptr, int base_offset,
+                                                  int offset, int width, char* name,
+                                                  TracingDirection td);
   void klee_trace_ret_ptr_nested_field(int base_offset,
                                        int offset, int width, char* name);
   void klee_trace_extra_ptr(void* ptr, int width, char* name, char* type, TracingDirection td);

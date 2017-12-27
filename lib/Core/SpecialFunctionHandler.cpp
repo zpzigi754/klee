@@ -136,6 +136,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_trace_ret_ptr_field", handleTraceRetPtrField, false),
   add("klee_trace_ret_ptr_field_just_ptr", handleTraceRetPtrFieldJustPtr, false),
   add("klee_trace_param_ptr_nested_field", handleTraceParamPtrNestedField, false),
+  add("klee_trace_param_ptr_nested_field_directed", handleTraceParamPtrNestedFieldDirected, false),
   add("klee_trace_ret_ptr_nested_field", handleTraceRetPtrNestedField, false),
   add("klee_trace_extra_ptr", handleTraceExtraPtr, false),
   add("klee_trace_extra_ptr_field", handleTraceExtraPtrField, false),
@@ -998,7 +999,34 @@ void SpecialFunctionHandler::handleTraceParamPtrNestedField
   Expr::Width width = (cast<klee::ConstantExpr>(arguments[3]))->getZExtValue();
   std::string name = readStringAtAddress(state, arguments[4]);
   width = width * 8;//Convert to bits.
-  state.traceArgPtrNestedField(arguments[0], base_offset, offset, width, name);
+  state.traceArgPtrNestedField(arguments[0], base_offset, offset, width, name, true, true);
+}
+
+void SpecialFunctionHandler::handleTraceParamPtrNestedFieldDirected
+(ExecutionState &state,
+ KInstruction *target,
+ std::vector<ref<Expr> > &arguments) {
+  int base_offset = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
+  int offset = (cast<klee::ConstantExpr>(arguments[2]))->getZExtValue();
+  Expr::Width width = (cast<klee::ConstantExpr>(arguments[3]))->getZExtValue();
+  std::string name = readStringAtAddress(state, arguments[4]);
+  width = width * 8;//Convert to bits.
+
+  bool trace_in = true, trace_out = true;
+  size_t direction = (cast<klee::ConstantExpr>(arguments[5]))->getZExtValue();
+  switch(direction) {
+    case 0: trace_in = false; trace_out = false; break;
+    case 1: trace_in = true;  trace_out = false; break;
+    case 2: trace_in = false; trace_out = true; break;
+    case 3: trace_in = true;  trace_out = true; break;
+    default:
+      executor.terminateStateOnError
+        (state, "Unrecognized tracing direction",
+        Executor::User);
+      return;
+  }
+
+  state.traceArgPtrNestedField(arguments[0], base_offset, offset, width, name, trace_in, trace_out);
 }
 
 void SpecialFunctionHandler::handleTraceParamPtrField(ExecutionState &state,

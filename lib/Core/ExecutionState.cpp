@@ -593,7 +593,8 @@ void ExecutionState::traceArgPtrNestedField(ref<Expr> arg,
                                             int base_offset,
                                             int offset,
                                             Expr::Width width,
-                                            std::string name) {
+                                            std::string name,
+                                            bool trace_in, bool trace_out) {
   assert(!callPath.empty() &&
          callPath.back().f == stack.back().kf->function &&
          "Must trace the function first to trace a particular field.");
@@ -611,12 +612,14 @@ void ExecutionState::traceArgPtrNestedField(ref<Expr> arg,
   descr.width = width;
   descr.name = name;
   size_t base = (cast<ConstantExpr>(arg))->getZExtValue();
-  ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + base_offset + offset,
-                                                   sizeof(size_t)*8);
-  descr.inVal = readMemoryChunk(addrExpr, width, true);
+  if (trace_in) {
+    ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + base_offset + offset,
+                                                     sizeof(size_t)*8);
+    descr.inVal = readMemoryChunk(addrExpr, width, true);
+  }
   descr.addr = base + base_offset + offset;
-  descr.doTraceValueIn = true;
-  descr.doTraceValueOut = true;
+  descr.doTraceValueIn = trace_in;
+  descr.doTraceValueOut = trace_out;
   argInfo->pointee.fields[base_offset].fields[offset] = descr;
 }
 
