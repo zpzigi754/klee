@@ -1129,12 +1129,12 @@ CallArg* CallInfo::getCallArgPtrp(ref<Expr> ptr) {
 
 bool equalContexts(const std::vector<ref<Expr> >& a,
                    const std::vector<ref<Expr> >& b) {
-  //TODO: naive comparison. should query the solver for the equality of conjunctions.
+  // TODO: Structural-only comparison here, ideally we'd ask the solver about it
   if (a.size() != b.size()) return false;
   for (unsigned i = 0; i < a.size(); ++i) {
     bool notFound = true;
     for (unsigned j = 0; j < b.size(); ++j) {
-      if (*a[i] == *b[j]) {
+      if ((*a[i]).compare(*b[j]) == 0) {
         notFound = false;
         break;
       }
@@ -1144,7 +1144,7 @@ bool equalContexts(const std::vector<ref<Expr> >& a,
   for (unsigned i = 0; i < b.size(); ++i) {
     bool notFound = true;
     for (unsigned j = 0; j < a.size(); ++j) {
-      if (*a[i] == *b[j]) {
+      if ((*a[i]).compare(*b[j]) == 0) {
         notFound = false;
         break;
       }
