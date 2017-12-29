@@ -286,7 +286,7 @@ void ObjectState::forgetAll() {
   //              << object->fake_object
   //              << object->isUserSpecified << "]:";
   const Array *array =
-    getArrayCache()->CreateArray("reset_arr" + llvm::utostr(++id),
+    getArrayCache()->CreateArray("reset_" + object->name + "_" + llvm::utostr(++id),
                                  size);
   UpdateList ul(array, 0);
   for (unsigned i=0; i<size; i++) {
@@ -312,7 +312,7 @@ void ObjectState::forgetThese(const BitArray *bytesToForget) {
   //assert(size != 0); //TODO: why size can ever be 0?
   if (size == 0) return;
   const Array *array =
-    getArrayCache()->CreateArray("reset_arr" + llvm::utostr(++id),
+    getArrayCache()->CreateArray("reset_" + object->name + "_" + llvm::utostr(++id),
                                  size);
   UpdateList ul(array, 0);
   for (unsigned i=0; i<size; i++) {
