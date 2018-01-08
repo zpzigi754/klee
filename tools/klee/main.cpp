@@ -786,7 +786,7 @@ void dumpRetSExpr(const RetVal& ret, llvm::raw_ostream& file) {
       if (ret.funPtr == NULL) {
         if (ret.pointee.doTraceValueIn ||
             ret.pointee.doTraceValueOut) {
-          file <<"(Curioptr ((before ((full ()) (break_down ()) (sname ())) (after ";
+          file <<"(Curioptr ((before ((full ()) (break_down ()) (sname ()))) (after ";
           dumpPointeeOutSExpr(ret.pointee, file);
           file <<")))\n";
         } else {
