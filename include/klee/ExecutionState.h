@@ -26,6 +26,7 @@
 #include <llvm/Analysis/LoopInfo.h>
 
 #include <map>
+#include <regex>
 #include <set>
 #include <vector>
 
@@ -72,6 +73,13 @@ struct StackFrame {
   StackFrame(KInstIterator caller, KFunction *kf);
   StackFrame(const StackFrame &s);
   ~StackFrame();
+};
+
+struct FunctionAlias {
+  bool isRegex;
+  std::regex nameRegex;
+  std::string name;
+  std::string alias;
 };
 
 struct FieldDescr {
@@ -188,7 +196,7 @@ private:
   // unsupported, use copy constructor
   ExecutionState &operator=(const ExecutionState &);
 
-  std::map<std::string, std::string> fnAliases;
+  std::vector<FunctionAlias> fnAliases;
 
 public:
   // Execution - Control Flow specific
@@ -284,6 +292,7 @@ public:
 
   std::string getFnAlias(std::string fn);
   void addFnAlias(std::string old_fn, std::string new_fn);
+  void addFnRegexAlias(std::string fn_regex, std::string new_fn);
   void removeFnAlias(std::string fn);
 
   // The objects handling the klee_open_merge calls this state ran through
