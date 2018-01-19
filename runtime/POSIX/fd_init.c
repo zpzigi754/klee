@@ -114,7 +114,10 @@ void klee_init_fds(unsigned n_files, unsigned file_length,
   char name[7] = "?-data";
   struct stat64 s;
 
-  stat64(".", &s);
+  // Only perform a stat if needed - avoids an external call otherwise
+  if (n_files > 0 || stdin_length || sym_stdout_flag) {
+    stat64(".", &s);
+  }
 
   __exe_fs.n_sym_files = n_files;
   __exe_fs.sym_files = malloc(sizeof(*__exe_fs.sym_files) * n_files);
