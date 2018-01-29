@@ -258,6 +258,62 @@ bool IntrinsicCleanerPass::runOnBasicBlock(BasicBlock &b, Module &M) {
         dirty = true;
         break;
       }
+
+      // The following instructions are all replaced by an "unreachable" since we don't actually use them...
+
+      // ptestz described in http://dpdk.org/ml/archives/dev/2014-August/004567.html
+      case Intrinsic::x86_sse41_ptestz: {
+        assert(ii->getNumArgOperands() == 2 && "wrong number of arguments");
+        Value *a = ii->getArgOperand(0);
+        assert(a && "Failed to get first argument");
+        Value *b = ii->getArgOperand(1);
+        assert(b && "Failed to get second argument");
+
+        Type* i32 = Type::getInt32Ty(ctx);
+
+        /*I think the instruction should look like this...
+        IRBuilder<> builder(ii->getParent(), ii);
+	ii->replaceAllUsesWith(
+          builder.CreateNot(
+            builder.CreateAnd(
+              builder.CreateAnd(
+                builder.CreateExtractElement(a, ConstantInt::get(i32, 0)),
+                builder.CreateExtractElement(b, ConstantInt::get(i32, 0))
+              ),
+              builder.CreateAnd(
+                builder.CreateExtractElement(a, ConstantInt::get(i32, 1)),
+                builder.CreateExtractElement(b, ConstantInt::get(i32, 1))
+              )
+            )
+          )
+        );*/
+        new UnreachableInst(ctx, ii);
+        ii->replaceAllUsesWith(ConstantInt::get(i32, 424242));
+        ii->eraseFromParent();
+        dirty = true;
+        break;
+      }
+      case Intrinsic::x86_ssse3_pshuf_b_128: {
+        assert(ii->getNumArgOperands() == 2 && "wrong number of arguments");
+        Value *a = ii->getArgOperand(0);
+        assert(a && "Failed to get first argument");
+        new UnreachableInst(ctx, ii);
+        ii->replaceAllUsesWith(a);
+        ii->eraseFromParent();
+        dirty = true;
+        break;
+      }
+      case Intrinsic::x86_sse41_phminposuw: {
+        assert(ii->getNumArgOperands() == 2 && "wrong number of arguments");
+        Value *a = ii->getArgOperand(0);
+        assert(a && "Failed to get first argument");
+        new UnreachableInst(ctx, ii);
+        ii->replaceAllUsesWith(a);
+        ii->eraseFromParent();
+        dirty = true;
+        break;
+      }
+
       // consistency fences, just ignore them
       case Intrinsic::x86_sse_sfence:
       case Intrinsic::x86_sse2_lfence:
