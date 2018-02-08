@@ -97,6 +97,8 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
 #else
   add("__error", handleErrnoLocation, true),
 #endif
+  add("klee_intercept_reads", handleInterceptReads, false),
+  add("klee_intercept_writes", handleInterceptWrites, false),
   add("klee_is_symbolic", handleIsSymbolic, true),
   add("klee_make_symbolic", handleMakeSymbolic, false),
   add("klee_mark_global", handleMarkGlobal, false),
@@ -797,6 +799,29 @@ void SpecialFunctionHandler::handleGetValue(ExecutionState &state,
          "invalid number of arguments to klee_get_value");
 
   executor.executeGetValue(state, arguments[0], target);
+}
+
+void SpecialFunctionHandler::handleInterceptReads(ExecutionState &state,
+                                                  KInstruction *target,
+                                                  std::vector<ref<Expr> > &arguments) {
+  assert(arguments.size()==2 &&
+         "invalid number of arguments to klee_intercept_reads");
+
+  uint64_t addr = cast<ConstantExpr>(arguments[0])->getZExtValue();
+  std::string reader = readStringAtAddress(state, arguments[1]);
+  state.addReadsIntercept(addr, reader);
+}
+
+void SpecialFunctionHandler::handleInterceptWrites(ExecutionState &state,
+                                                   KInstruction *target,
+                                                   std::vector<ref<Expr> > &arguments) {
+  assert(arguments.size()==2 &&
+         "invalid number of arguments to klee_intercept_writes");
+
+  uint64_t addr = cast<ConstantExpr>(arguments[0])->getZExtValue();
+  std::string writer = readStringAtAddress(state, arguments[1]);
+
+  state.addWritesIntercept(addr, writer);
 }
 
 void SpecialFunctionHandler::handleDefineFixedObject(ExecutionState &state,

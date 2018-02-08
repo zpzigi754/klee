@@ -125,6 +125,9 @@ ExecutionState::ExecutionState(const ExecutionState& state):
     stack(state.stack),
     incomingBBIndex(state.incomingBBIndex),
 
+    readsIntercepts(state.readsIntercepts),
+    writesIntercepts(state.writesIntercepts),
+
     addressSpace(state.addressSpace),
     loopInProcess(state.loopInProcess) ,
     analysedLoops(state.analysedLoops),
@@ -233,6 +236,32 @@ void ExecutionState::removeFnAlias(std::string fn) {
                                    return candidate.name == fn;
                                  }),
                   fnAliases.end());
+}
+
+std::string ExecutionState::getInterceptReader(uint64_t addr) {
+  auto it = readsIntercepts.find(addr);
+  if (it == readsIntercepts.end()) {
+    return "";
+  }
+
+  return it->second;
+}
+
+std::string ExecutionState::getInterceptWriter(uint64_t addr) {
+  auto it = writesIntercepts.find(addr);
+  if (it == writesIntercepts.end()) {
+    return "";
+  }
+
+  return it->second;
+}
+
+void ExecutionState::addReadsIntercept(uint64_t addr, std::string reader) {
+  readsIntercepts[addr] = reader;
+}
+
+void ExecutionState::addWritesIntercept(uint64_t addr, std::string writer) {
+  writesIntercepts[addr] = writer;
 }
 
 /**/

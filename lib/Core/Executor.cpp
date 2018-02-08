@@ -2257,7 +2257,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   case Instruction::Store: {
     ref<Expr> base = eval(ki, 1, state).value;
     ref<Expr> value = eval(ki, 0, state).value;
-    executeMemoryOperation(state, true, base, value, 0);
+    executeMemoryOperation(state, true, base, value, ki);
     break;
   }
 
@@ -3521,7 +3521,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
                                       bool isWrite,
                                       ref<Expr> address,
                                       ref<Expr> value /* undef if read */,
-                                      KInstruction *target /* undef if write */) {
+                                      KInstruction *target) {
   Expr::Width type = (isWrite ? value->getWidth() : 
                      getWidthForLLVMType(target->inst->getType()));
   unsigned bytes = Expr::getMinBytesForWidth(type);
@@ -3572,6 +3572,47 @@ void Executor::executeMemoryOperation(ExecutionState &state,
       terminateStateEarly(state, "Query timed out (bounds check).");
       return;
     }
+
+    // check if the operation is intercepted
+    if (isWrite) {
+      std::string interceptWriter = state.getInterceptWriter(mo->address);
+      if (interceptWriter != "") {
+        GlobalValue *gv = kmodule->module->getNamedValue(interceptWriter);
+        if (!gv) {
+          klee_error("Function %s(), interceptor, not found!\n", interceptWriter.c_str());
+        }
+        Function* interceptFunc;
+        if (!(interceptFunc = dyn_cast<Function>(gv))) {
+          klee_error("Interceptor is not a function\n");
+        }
+        std::vector<ref<Expr>> interceptArgs;
+        interceptArgs.push_back(/* address */ ConstantExpr::alloc(mo->address, 64));
+        interceptArgs.push_back(/* offset */ ZExtExpr::create(offset, 32));
+        interceptArgs.push_back(/* size */ ConstantExpr::alloc(bytes, 32));
+        interceptArgs.push_back(/* value */ value);
+        executeCall(state, target, interceptFunc, interceptArgs);
+        return;
+      }
+    } else {
+      std::string interceptReader = state.getInterceptReader(mo->address);
+      if (interceptReader != "") {
+        GlobalValue *gv = kmodule->module->getNamedValue(interceptReader);
+        if (!gv) {
+          klee_error("Function %s(), interceptor, not found!\n", interceptReader.c_str());
+        }
+        Function* interceptFunc;
+        if (!(interceptFunc = dyn_cast<Function>(gv))) {
+          klee_error("Interceptor is not a function\n");
+        }
+        std::vector<ref<Expr>> interceptArgs;
+        interceptArgs.push_back(/* address */ ConstantExpr::alloc(mo->address, 64));
+        interceptArgs.push_back(/* offset */ ZExtExpr::create(offset, 32));
+        interceptArgs.push_back(/* size */ ConstantExpr::alloc(bytes, 32));
+        executeCall(state, target, interceptFunc, interceptArgs);
+        return;
+      }
+    }
+
 
     if (inBounds) {
       const ObjectState *os = op.second;
