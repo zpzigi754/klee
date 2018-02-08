@@ -197,6 +197,8 @@ private:
   ExecutionState &operator=(const ExecutionState &);
 
   std::vector<FunctionAlias> fnAliases;
+  std::map<uint64_t, std::string> readsIntercepts;
+  std::map<uint64_t, std::string> writesIntercepts;
 
 public:
   // Execution - Control Flow specific
@@ -294,6 +296,11 @@ public:
   void addFnAlias(std::string old_fn, std::string new_fn);
   void addFnRegexAlias(std::string fn_regex, std::string new_fn);
   void removeFnAlias(std::string fn);
+
+  std::string getInterceptReader(uint64_t addr);
+  std::string getInterceptWriter(uint64_t addr);
+  void addReadsIntercept(uint64_t addr, std::string reader);
+  void addWritesIntercept(uint64_t addr, std::string writer);
 
   // The objects handling the klee_open_merge calls this state ran through
   std::vector<ref<MergeHandler> > openMergeStack;

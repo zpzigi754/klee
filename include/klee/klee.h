@@ -11,13 +11,34 @@
 #define __KLEE_H__
 
 #include <assert.h>
-#include "stdint.h"
+#include "inttypes.h"
 #include "stddef.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-  
+  // Types of the reader/writer for intercepts
+  /* size is in bytes; value must be zero-extended if size < 8 */
+  typedef uint64_t (*klee_reader)(uint64_t addr, unsigned offset, unsigned size);
+  /* size is in bytes; value may be zero-padded if size < 8 */
+  typedef void (*klee_writer)(uint64_t addr, unsigned offset, unsigned size, uint64_t value);
+
+  /*
+   * Intercepts reads to the specified block of memory,
+   * redirecting them to the specified reader.
+   * This can be used for fine-grained access control, or to execute code
+   * on each read (such as when modeling hardware).
+   */
+  void klee_intercept_reads(void* addr, const char* reader_name);
+
+  /*
+   * Intercepts writes to the specified block of memory,
+   * redirecting them to the specified writer.
+   * This can be used for fine-grained access control, or to execute code
+   * on each write (such as when modeling hardware).
+   */
+  void klee_intercept_writes(void* addr, const char* writer_name);
+
   /* Add an accesible memory object at a user specified location. It
    * is the users responsibility to make sure that these memory
    * objects do not overlap. These memory objects will also

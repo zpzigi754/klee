@@ -115,6 +115,8 @@ namespace klee {
     HANDLER(handleGetErrno);
     HANDLER(handleGetObjSize);
     HANDLER(handleGetValue);
+    HANDLER(handleInterceptReads);
+    HANDLER(handleInterceptWrites);
     HANDLER(handleIsSymbolic);
     HANDLER(handleMakeSymbolic);
     HANDLER(handleMalloc);
