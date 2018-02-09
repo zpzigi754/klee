@@ -3589,7 +3589,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
         interceptArgs.push_back(/* address */ ConstantExpr::alloc(mo->address, 64));
         interceptArgs.push_back(/* offset */ ZExtExpr::create(offset, 32));
         interceptArgs.push_back(/* size */ ConstantExpr::alloc(bytes, 32));
-        interceptArgs.push_back(/* value */ value);
+        interceptArgs.push_back(/* value */ ZExtExpr::create(value, 64));
         executeCall(state, target, interceptFunc, interceptArgs);
         return;
       }
