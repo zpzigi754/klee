@@ -218,7 +218,8 @@ extern "C" {
                                      const char* name,
                                      TracingDirection td);
   void klee_trace_param_tagged_ptr(void* ptr, int width,
-                                   const char* name, const char* type);
+                                   const char* name, const char* type,
+                                   TracingDirection td);
   void klee_trace_param_just_ptr(void* ptr, int width, const char* name);
   void klee_trace_param_fptr(void* ptr, const char* name);
   void klee_trace_ret();
