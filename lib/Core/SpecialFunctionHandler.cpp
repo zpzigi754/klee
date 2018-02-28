@@ -1246,11 +1246,30 @@ void SpecialFunctionHandler::handleTraceParamTaggedPtr(ExecutionState &state,
        Executor::User);
     return;
   }
+  if (!isa<klee::ConstantExpr>(arguments[4])) {
+    executor.terminateStateOnError
+      (state, "Direction must be a static constant.",
+       Executor::User);
+    return;
+  }
   Expr::Width width = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
   width = width * 8;//Convert to bits.
   std::string name = readStringAtAddress(state, arguments[2]);
   std::string type = readStringAtAddress(state, arguments[3]);
-  state.traceArgPtr(arguments[0], width, name, type, true, true);
+  size_t direction = (cast<klee::ConstantExpr>(arguments[4]))->getZExtValue();
+  bool trace_in = false, trace_out = false;
+  switch(direction) {
+  case 0: trace_in = false; trace_out = false; break;
+  case 1: trace_in = true;  trace_out = false; break;
+  case 2: trace_in = false; trace_out = true; break;
+  case 3: trace_in = true;  trace_out = true; break;
+  default:
+    executor.terminateStateOnError
+      (state, "Unrecognized tracing direction",
+       Executor::User);
+    return;
+  }
+  state.traceArgPtr(arguments[0], width, name, type, trace_in, trace_out);
 }
 
 void SpecialFunctionHandler::handleTraceParamPtr(ExecutionState &state,
