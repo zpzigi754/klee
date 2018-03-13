@@ -1303,6 +1303,16 @@ static const char *modelledExternals[] = {
   "_ZTVN10__cxxabiv120__si_class_type_infoE",
   "_ZTVN10__cxxabiv121__vmi_class_type_infoE",
 
+  "klee_trace_extra_ptr",
+  "klee_trace_extra_ptr_field",
+  "klee_trace_extra_ptr_nested_field",
+  "klee_trace_extra_ptr_nested_nested_field",
+  "klee_trace_param_i64",
+  "klee_trace_param_ptr_directed",
+  "klee_trace_param_ptr_field_directed",
+  "klee_trace_param_ptr_nested_field_directed",
+  "klee_trace_param_u16",
+
   // special functions
   "_assert",
   "__assert_fail",
