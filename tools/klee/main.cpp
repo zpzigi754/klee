@@ -308,6 +308,7 @@ public:
   llvm::raw_fd_ostream  *openNextCallPathPrefixFile();
 
   void dumpCallPathPrefixes();
+  void dumpCallPath(const ExecutionState &state, llvm::raw_ostream *file);
 };
 
 KleeHandler::KleeHandler(int argc, char **argv)
@@ -477,6 +478,13 @@ void KleeHandler::processTestCase(const ExecutionState &state,
         klee_warning("unable to write output test case, losing it");
       } else {
         ++m_numGeneratedTests;
+      }
+
+      if (DumpCallTraces) {
+        llvm::raw_fd_ostream *trace_file =
+          openOutputFile(getTestFilename("call_path", id));
+        dumpCallPath(state, trace_file);
+        delete trace_file;
       }
 
       for (unsigned i=0; i<b.numObjects; i++)
@@ -877,6 +885,20 @@ llvm::raw_fd_ostream *KleeHandler::openNextCallPathPrefixFile() {
 void KleeHandler::dumpCallPathPrefixes() {
   m_callTree.dumpCallPrefixesSExpr(std::list<CallInfo>(), this);
   //m_callTree.dumpCallPrefixes(std::list<CallInfo>(), std::list<const std::vector<ref<Expr> >* >(), this);
+}
+
+void KleeHandler::dumpCallPath(const ExecutionState &state, llvm::raw_ostream *file) {
+  for (std::vector<CallInfo>::const_iterator iter = state.callPath.begin(),
+         end = state.callPath.end(); iter != end; ++iter) {
+    const CallInfo& ci = *iter;
+    bool dumped = dumpCallInfo(ci, *file);
+    if (!dumped) break;
+  }
+  *file <<";;-- Constraints --\n";
+  for (ConstraintManager::constraint_iterator ci = state.constraints.begin(),
+         cEnd = state.constraints.end(); ci != cEnd; ++ci) {
+    *file <<**ci<<"\n";
+  }
 }
 
 
