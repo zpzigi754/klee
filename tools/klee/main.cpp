@@ -1355,6 +1355,7 @@ static const char *modelledExternals[] = {
   "klee_trace_param_ptr_field",
   "klee_trace_param_ptr_field_just_ptr",
   "klee_trace_param_ptr_nested_field",
+  "klee_trace_param_tagged_ptr",
   "klee_trace_ret",
   "klee_induce_invariants",
   "klee_trace_ret_ptr",
