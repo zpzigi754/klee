@@ -6,10 +6,14 @@
 # License. See LICENSE.TXT for details.
 #
 #===------------------------------------------------------------------------===#
-add_subdirectory(gen-random-bout)
-add_subdirectory(kleaver)
-add_subdirectory(klee)
-add_subdirectory(klee-replay)
-add_subdirectory(klee-stats)
-add_subdirectory(ktest-tool)
-add_subdirectory(ktest-dehavoc)
+add_executable(ktest-dehavoc
+  ktest-dehavoc.cpp
+)
+
+set(KLEE_LIBS
+  kleeCore
+)
+
+target_link_libraries(ktest-dehavoc ${KLEE_LIBS})
+
+install(TARGETS ktest-dehavoc RUNTIME DESTINATION bin)
