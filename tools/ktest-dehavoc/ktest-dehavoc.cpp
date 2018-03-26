@@ -14,6 +14,8 @@
 #include <map>
 #include <vector>
 
+#define HAVOC_PREFIX "reset_"
+
 namespace {
 llvm::cl::opt<std::string> InputFile(llvm::cl::desc("<input ktest>"),
                                      llvm::cl::Positional, llvm::cl::init("-"));
@@ -36,19 +38,28 @@ int main(int argc, char **argv, char **envp) {
   out.symArgvLen = in->symArgvLen;
 
   std::vector<KTestObject> objects(in->objects, in->objects + in->numObjects);
-  std::map<std::string, KTestObject> unique_objects;
+  std::map<std::string, KTestObject> havoced_objects;
 
   for (auto it : objects) {
-    unique_objects[it.name] = it;
+    std::string name = it.name;
+
+    if (!name.compare(0, sizeof(HAVOC_PREFIX) - 1, HAVOC_PREFIX)) {
+      havoced_objects[name] = it;
+    }
   }
 
   for (auto it = objects.begin(); it != objects.end();) {
-    if (unique_objects.count(it->name)) {
-      *it = unique_objects[it->name];
-      unique_objects.erase(it->name);
-      it++;
-    } else {
+    std::string name = it->name;
+    std::string havoced_name = HAVOC_PREFIX;
+    havoced_name += name;
+
+    if (!name.compare(0, sizeof(HAVOC_PREFIX) - 1, HAVOC_PREFIX)) {
       it = objects.erase(it);
+    } else {
+      if (havoced_objects.count(havoced_name)) {
+        *it = havoced_objects[havoced_name];
+      }
+      it++;
     }
   }
 
