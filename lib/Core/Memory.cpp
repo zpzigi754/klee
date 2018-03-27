@@ -274,11 +274,11 @@ void ObjectState::makeSymbolic() {
   }
 }
 
-void ObjectState::forgetAll() {
+const Array *ObjectState::forgetAll() {
   assert(accessible);
   static unsigned id = 0;
   //assert(size != 0); //TODO: why size can ever be 0?
-  if (size == 0) return;
+  if (size == 0) return NULL;
   // llvm::errs() << " forgetting ["
   //              << object->isGlobal
   //              << object->isLocal
@@ -304,13 +304,14 @@ void ObjectState::forgetAll() {
   if (flushMask) delete flushMask;
   flushMask = 0;
   // llvm::errs() << "\n";
+  return array;
 }
 
-void ObjectState::forgetThese(const BitArray *bytesToForget) {
+const Array *ObjectState::forgetThese(const BitArray *bytesToForget) {
   assert(accessible);
   static unsigned id = 0;
   //assert(size != 0); //TODO: why size can ever be 0?
-  if (size == 0) return;
+  if (size == 0) return NULL;
   const Array *array =
     getArrayCache()->CreateArray("reset_" + object->name + "_" + llvm::utostr(++id),
                                  size);
@@ -324,6 +325,7 @@ void ObjectState::forgetThese(const BitArray *bytesToForget) {
     }
   }
   // llvm::errs() << "\n";
+  return array;
 }
 
 void ObjectState::forbidAccess(const llvm::Twine& msg) {
