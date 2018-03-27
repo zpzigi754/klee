@@ -44,20 +44,22 @@ int main(int argc, char **argv, char **envp) {
     std::string name = it.name;
 
     if (!name.compare(0, sizeof(HAVOC_PREFIX) - 1, HAVOC_PREFIX)) {
+      while (!name.compare(0, sizeof(HAVOC_PREFIX) - 1, HAVOC_PREFIX)) {
+        name = name.substr(sizeof(HAVOC_PREFIX) - 1);
+      }
+
       havoced_objects[name] = it;
     }
   }
 
   for (auto it = objects.begin(); it != objects.end();) {
     std::string name = it->name;
-    std::string havoced_name = HAVOC_PREFIX;
-    havoced_name += name;
 
     if (!name.compare(0, sizeof(HAVOC_PREFIX) - 1, HAVOC_PREFIX)) {
       it = objects.erase(it);
     } else {
-      if (havoced_objects.count(havoced_name)) {
-        *it = havoced_objects[havoced_name];
+      if (havoced_objects.count(name)) {
+        *it = havoced_objects[name];
       }
       it++;
     }
