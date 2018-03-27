@@ -11,6 +11,7 @@
 
 #include "klee/Internal/ADT/KTest.h"
 #include "llvm/Support/CommandLine.h"
+#include <iostream>
 #include <map>
 #include <vector>
 
@@ -45,7 +46,10 @@ int main(int argc, char **argv, char **envp) {
 
     if (!name.compare(0, sizeof(HAVOC_PREFIX) - 1, HAVOC_PREFIX)) {
       while (!name.compare(0, sizeof(HAVOC_PREFIX) - 1, HAVOC_PREFIX)) {
+        // Drop prefix.
         name = name.substr(sizeof(HAVOC_PREFIX) - 1);
+        // Drop suffix.
+        name = name.substr(0, name.rfind("_"));
       }
 
       havoced_objects[name] = it;
@@ -59,7 +63,9 @@ int main(int argc, char **argv, char **envp) {
       it = objects.erase(it);
     } else {
       if (havoced_objects.count(name)) {
+        std::cout << "Dehavocing " << name << std::endl;
         *it = havoced_objects[name];
+        it->name = (char *) (new std::string(name))->c_str();
       }
       it++;
     }
