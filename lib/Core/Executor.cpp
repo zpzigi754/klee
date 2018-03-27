@@ -3985,8 +3985,13 @@ bool Executor::getSymbolicSolution(const ExecutionState &state,
     return false;
   }
   
-  for (unsigned i = 0; i != state.symbolics.size(); ++i)
-    res.push_back(std::make_pair(state.symbolics[i].first->name, values[i]));
+  for (unsigned i = 0; i != state.symbolics.size(); ++i) {
+    if (!state.symbolics[i].second->name.compare(0, strlen("reset_"), "reset_")) {
+      res.push_back(std::make_pair(state.symbolics[i].second->name, values[i]));
+    } else {
+      res.push_back(std::make_pair(state.symbolics[i].first->name, values[i]));
+    }
+  }
   return true;
 }
 
