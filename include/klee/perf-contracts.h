@@ -27,11 +27,9 @@ void contract_init();
 /**
  * Gets the list of user-defined variables that the contract exports. Returns an
  * empty list if no user variables are to be exported
- * @param function_name The name of the function to look up.
  * @returns A map associating each variable name to its worst-case value.
  */
-std::map<std::string, std::string>
-contract_get_user_variables(std::string function_name);
+std::map<std::string, std::string> contract_get_user_variables();
 
 /**
  * Check whether a given function is covered by a contract.
