@@ -12,7 +12,7 @@
   {                                                                            \
     const char *err = NULL;                                                    \
     if ((err = dlerror())) {                                                   \
-      std::cout << "Error loading symbol: " << err << std::endl;               \
+      std::cerr << "Error loading symbol: " << err << std::endl;               \
       exit(-1);                                                                \
     }                                                                          \
     assert(symbol && "Error loading symbol.");                                 \
