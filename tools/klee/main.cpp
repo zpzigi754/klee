@@ -1350,6 +1350,7 @@ static const char *modelledExternals[] = {
   "klee_report_error",
   "klee_trace_param_fptr",
   "klee_trace_param_i32",
+  "klee_trace_param_u32",
   "klee_trace_param_ptr",
   "klee_trace_param_just_ptr",
   "klee_trace_param_ptr_field",
