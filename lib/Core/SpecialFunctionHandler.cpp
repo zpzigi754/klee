@@ -123,6 +123,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_trace_paramll", handleTraceParam, false),
   add("klee_trace_param_u16", handleTraceParam, false),
   add("klee_trace_param_i32", handleTraceParam, false),
+  add("klee_trace_param_u32", handleTraceParam, false),
   add("klee_trace_param_i64", handleTraceParam, false),
   add("klee_trace_param_ptr", handleTraceParamPtr, false),
   add("klee_trace_param_ptr_directed", handleTraceParamPtrDirected, false),
