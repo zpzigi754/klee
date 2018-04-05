@@ -43,11 +43,10 @@ bool contract_has_contract(std::string function_name);
  * Gets the set of optimization variables that the contact exports as well as
  * their candidate values.
  *
- * @param function_name The name of the function to look up.
  * @returns A map associating each variable name to a set of candidate values.
  */
 std::map<std::string, std::set<std::string>>
-contract_get_optimization_variables(std::string function_name);
+contract_get_optimization_variables();
 
 /**
  * Gets the number of subcontracts (mutually exclusive scenarios that partition
