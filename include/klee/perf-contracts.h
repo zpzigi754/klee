@@ -32,21 +32,36 @@ void contract_init();
 std::map<std::string, std::string> contract_get_user_variables();
 
 /**
- * Check whether a given function is covered by a contract.
- *
- * @param function_name The name of the function to check.
- * @returns true iff the function has a contract.
- */
-bool contract_has_contract(std::string function_name);
-
-/**
- * Gets the set of optimization variables that the contact exports as well as
+ * Gets the set of optimization variables that the contract exports as well as
  * their candidate values.
  *
  * @returns A map associating each variable name to a set of candidate values.
  */
 std::map<std::string, std::set<std::string>>
 contract_get_optimization_variables();
+
+/**
+ * Gets the set of symbol declarations used.
+ *
+ * @returns A set of symbol declarations used.
+ */
+std::set<std::string>
+contract_get_symbols();
+
+/**
+ * Gets a set of functions with contracts.
+ *
+ * @returns the set of function with contracts.
+ */
+std::set<std::string> contract_get_contracts();
+
+/**
+ * Check whether a given function is covered by a contract.
+ *
+ * @param function_name The name of the function to check.
+ * @returns true iff the function has a contract.
+ */
+bool contract_has_contract(std::string function_name);
 
 /**
  * Gets the number of subcontracts (mutually exclusive scenarios that partition
@@ -76,7 +91,7 @@ std::string contract_get_subcontract_constraints(std::string function_name,
  * variables.
  * @returns The computed CPU cycle bound.
  */
-int contract_get_sub_contract_performance(
+long contract_get_sub_contract_performance(
     std::string function_name, int sub_contract_idx,
     std::map<std::string, long> variables);
 }
