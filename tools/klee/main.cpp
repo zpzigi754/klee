@@ -22,6 +22,8 @@
 #include "klee/Internal/System/Time.h"
 #include "klee/Interpreter.h"
 #include "klee/Statistics.h"
+#include "klee/ExprBuilder.h"
+#include "klee/util/ExprPPrinter.h"
 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Type.h"
@@ -904,6 +906,33 @@ void KleeHandler::dumpCallPathPrefixes() {
 }
 
 void KleeHandler::dumpCallPath(const ExecutionState &state, llvm::raw_ostream *file) {
+  std::vector<klee::ref<klee::Expr> > evalExprs;
+  std::vector<const klee::Array *> evalArrays;
+
+  for (auto ci : state.callPath) {
+    for (auto e : ci.extraPtrs) {
+      if (e.second.pointee.doTraceValueIn) {
+        evalExprs.push_back(e.second.pointee.inVal);
+      }
+      if (e.second.pointee.doTraceValueOut) {
+        evalExprs.push_back(e.second.pointee.outVal);
+      }
+    }
+  }
+
+  ExprBuilder *exprBuilder = createDefaultExprBuilder();
+  std::string kleaverStr;
+  llvm::raw_string_ostream kleaverROS(kleaverStr);
+  ExprPPrinter::printQuery(kleaverROS, state.constraints, exprBuilder->False(),
+                           &evalExprs[0], &evalExprs[0] + evalExprs.size(),
+                           &evalArrays[0], &evalArrays[0] + evalArrays.size(),
+                           true);
+  kleaverROS.flush();
+
+  *file <<";;-- kQuery --\n";
+  *file << kleaverROS.str();
+
+  *file <<";;-- Calls --\n";
   for (std::vector<CallInfo>::const_iterator iter = state.callPath.begin(),
          end = state.callPath.end(); iter != end; ++iter) {
     const CallInfo& ci = *iter;
