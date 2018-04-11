@@ -11,6 +11,7 @@ add_executable(stitch-perf-contract
 )
 
 set(KLEE_LIBS
+  kleaverExpr
   kleeCore
 )
 
