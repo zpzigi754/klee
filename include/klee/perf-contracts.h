@@ -41,6 +41,14 @@ std::map<std::string, std::set<std::string>>
 contract_get_optimization_variables();
 
 /**
+ * Gets the set of symbol declarations used.
+ *
+ * @returns A set of symbol declarations used.
+ */
+std::set<std::string>
+contract_get_symbols();
+
+/**
  * Gets a set of functions with contracts.
  *
  * @returns the set of function with contracts.
