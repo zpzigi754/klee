@@ -21,6 +21,8 @@
 #include <klee/Solver.h>
 #include <vector>
 
+#define DEBUG
+
 namespace {
 llvm::cl::opt<std::string>
     ContractLib("contract",
@@ -46,6 +48,7 @@ typedef struct {
 typedef struct {
   klee::ConstraintManager constraints;
   std::vector<call_t> calls;
+  std::map<std::string, const klee::Array *> arrays;
   std::map<std::string, klee::ref<klee::Expr>> initial_extra_vars;
 } call_path_t;
 
@@ -107,8 +110,6 @@ call_path_t *load_call_path(std::string file_name,
         }
         kQuery += "])";
 
-        std::cout << kQuery << std::endl;
-
         llvm::MemoryBuffer *MB = llvm::MemoryBuffer::getMemBuffer(kQuery);
         klee::ExprBuilder *Builder = klee::createDefaultExprBuilder();
         klee::expr::Parser *P =
@@ -116,8 +117,10 @@ call_path_t *load_call_path(std::string file_name,
         while (klee::expr::Decl *D = P->ParseTopLevelDecl()) {
           assert(!P->GetNumErrors() &&
                  "Error parsing kquery in call path file.");
-          if (klee::expr::QueryCommand *QC =
-                  dyn_cast<klee::expr::QueryCommand>(D)) {
+          if (klee::expr::ArrayDecl *AD = dyn_cast<klee::expr::ArrayDecl>(D)) {
+            call_path->arrays[AD->Root->name] = AD->Root;
+          } else if (klee::expr::QueryCommand *QC =
+                         dyn_cast<klee::expr::QueryCommand>(D)) {
             call_path->constraints = klee::ConstraintManager(QC->Constraints);
             exprs = QC->Values;
             break;
@@ -229,14 +232,16 @@ long process_candidate(call_path_t *call_path, void *contract,
   LOAD_SYMBOL(contract, contract_get_subcontract_constraints);
   LOAD_SYMBOL(contract, contract_get_sub_contract_performance);
 
-  std::cout << std::endl;
-  std::cout << "Trying candidate with variables:" << std::endl;
+#ifdef DEBUG
+  std::cerr << std::endl;
+  std::cerr << "Debug: Trying candidate with variables:" << std::endl;
   for (auto vit : vars) {
-    std::cout << vit.first << " = " << std::flush;
-    vit.second->print(llvm::outs());
-    llvm::outs().flush();
-    std::cout << std::endl;
+    std::cerr << "Debug:   " << vit.first << " = " << std::flush;
+    vit.second->print(llvm::errs());
+    llvm::errs().flush();
+    std::cerr << std::endl;
   }
+#endif
 
   klee::Solver *solver = klee::createCoreSolver(klee::STP_SOLVER);
   solver = createCexCachingSolver(solver);
@@ -256,12 +261,9 @@ long process_candidate(call_path_t *call_path, void *contract,
       assert(solver->mayBeTrue(sat_query, result));
 
       if (!result) {
+#ifdef DEBUG
         std::cerr << "Debug: Candidate is trivially UNSAT." << std::endl;
-        for (auto cit : constraints) {
-          cit->dump();
-        }
-        eq_expr->dump();
-        llvm::errs().flush();
+#endif
         return -1;
       }
 
@@ -271,6 +273,16 @@ long process_candidate(call_path_t *call_path, void *contract,
     }
   }
 
+#ifdef DEBUG
+  std::cerr << "Debug: Using candidate with variables:" << std::endl;
+  for (auto vit : vars) {
+    std::cerr << "Debug:   " << vit.first << " = " << std::flush;
+    vit.second->print(llvm::errs());
+    llvm::errs().flush();
+    std::cerr << std::endl;
+  }
+#endif
+
   long cycles = 0;
   for (auto cit : call_path->calls) {
     if (!contract_has_contract(cit.function_name)) {
@@ -279,23 +291,40 @@ long process_candidate(call_path_t *call_path, void *contract,
       continue;
     }
 
+    klee::ConstraintManager call_constraints = constraints;
+
+    for (auto extra_var : cit.extra_vars) {
+      std::string current_name = "current_" + extra_var.first;
+
+      assert(call_path->arrays.count(current_name));
+      const klee::Array *array = call_path->arrays[current_name];
+      klee::UpdateList ul(array, 0);
+      klee::ref<klee::Expr> read_expr =
+          exprBuilder->Read(ul, exprBuilder->Constant(0, klee::Expr::Int32));
+      for (unsigned offset = 1; offset < array->getSize(); offset++) {
+        read_expr = exprBuilder->Concat(
+            exprBuilder->Read(ul,
+                              exprBuilder->Constant(offset, klee::Expr::Int32)),
+            read_expr);
+      }
+      klee::ref<klee::Expr> eq_expr =
+          exprBuilder->Eq(read_expr, extra_var.second.first);
+
+      call_constraints.addConstraint(eq_expr);
+    }
+
     bool found_subcontract = false;
     for (int sub_contract_idx = 0;
          sub_contract_idx < contract_num_sub_contracts(cit.function_name);
          sub_contract_idx++) {
-      //       std::cerr << "Constraints for " << cit.function_name << "/"
-      //                 << sub_contract_idx << ":" << std::endl;
-      //       subcontract_constraints[std::make_pair(cit.function_name,
-      //                                              sub_contract_idx)]
-      //           ->dump();
-
-      klee::Query sat_query(constraints,
+      klee::Query sat_query(call_constraints,
                             subcontract_constraints[std::make_pair(
                                 cit.function_name, sub_contract_idx)]);
       bool result = false;
       assert(solver->mayBeTrue(sat_query, result));
 
       if (result) {
+        assert(!found_subcontract && "Multiple subcontracts match.");
         found_subcontract = true;
 
         std::map<std::string, long> variables;
@@ -306,20 +335,31 @@ long process_candidate(call_path_t *call_path, void *contract,
 
           variables[extra_var.first] = result->getLimitedValue();
         }
+#ifdef DEBUG
+        std::cerr << "Debug: Calling " << cit.function_name
+                  << " with variables:" << std::endl;
+        for (auto vit : variables) {
+          std::cerr << "Debug:   " << vit.first << " = " << vit.second
+                    << std::endl;
+        }
+#endif
+
         cycles += contract_get_sub_contract_performance(
             cit.function_name, sub_contract_idx, variables);
-
-        break;
       }
     }
     if (!found_subcontract) {
+#ifdef DEBUG
       std::cerr << "Debug: No subcontract for " << cit.function_name
                 << " is SAT." << std::endl;
+#endif
       return -1;
     }
   }
 
-  std::cout << "Candidate cycles: " << cycles << std::endl;
+#ifdef DEBUG
+  std::cerr << "Debug: Candidate cycles: " << cycles << std::endl;
+#endif
   return cycles;
 }
 
@@ -330,8 +370,8 @@ int main(int argc, char **argv, char **envp) {
   const char *err = NULL;
   void *contract = dlopen(ContractLib.c_str(), RTLD_NOW);
   if ((err = dlerror())) {
-    std::cerr << "Error loading contract plugin " << ContractLib << ": " << err
-              << std::endl;
+    std::cerr << "Error: Unable to load contract plugin " << ContractLib << ": "
+              << err << std::endl;
     exit(-1);
   }
   assert(contract);
@@ -367,11 +407,11 @@ int main(int argc, char **argv, char **envp) {
         user_variable_string.substr(user_variable_string.find("=") + 1);
 
     if (!user_variables_str.count(user_var)) {
-      std::cerr << "User variable " << user_var << " not defined in contract."
-                << std::endl
-                << "Valid user variables:" << std::endl;
+      std::cerr << "Error: User variable " << user_var
+                << " not defined in contract." << std::endl
+                << "Error: Valid user variables:" << std::endl;
       for (auto it : user_variables_str) {
-        std::cerr << "  " << it.first << std::endl;
+        std::cerr << "Error:   " << it.first << std::endl;
       }
       exit(-1);
     }
@@ -438,13 +478,15 @@ int main(int argc, char **argv, char **envp) {
     candidate_iterators[it.first] = it.second.begin();
   }
 
-  std::cout << "Binding user variables to:" << std::endl;
+#ifdef DEBUG
+  std::cerr << "Debug: Binding user variables to:" << std::endl;
   for (auto vit : user_variables) {
-    std::cout << vit.first << " = " << std::flush;
-    vit.second->print(llvm::outs());
-    llvm::outs().flush();
-    std::cout << std::endl;
+    std::cerr << "Debug:   " << vit.first << " = " << std::flush;
+    vit.second->print(llvm::errs());
+    llvm::errs().flush();
+    std::cerr << std::endl;
   }
+#endif
 
   long max_cycles = -1;
   std::map<std::string, std::set<klee::ref<klee::Expr>>::iterator>::iterator
@@ -453,7 +495,9 @@ int main(int argc, char **argv, char **envp) {
     std::map<std::string, klee::ref<klee::Expr>> vars = user_variables;
 
     for (auto it : candidate_iterators) {
-      vars[it.first] = *it.second;
+      if (!user_variables_str.count(it.first)) {
+        vars[it.first] = *it.second;
+      }
     }
 
     long cycles = process_candidate(call_path, contract, vars);
@@ -474,7 +518,11 @@ int main(int argc, char **argv, char **envp) {
     }
   } while (pos != candidate_iterators.end());
 
-  std::cout << max_cycles << std::endl;
-
-  return 0;
+  if (max_cycles >= 0) {
+    std::cout << max_cycles << std::endl;
+    return 0;
+  } else {
+    std::cerr << "Error: No candidate was SAT." << std::endl;
+    return -1;
+  }
 }
