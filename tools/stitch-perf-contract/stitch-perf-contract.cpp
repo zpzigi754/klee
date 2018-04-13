@@ -334,6 +334,12 @@ long process_candidate(call_path_t *call_path, void *contract,
           assert(solver->getValue(expr_query, result));
 
           variables[extra_var.first] = result->getLimitedValue();
+
+          bool check = true;
+          assert(solver->mayBeFalse(expr_query.withExpr(exprBuilder->Eq(
+                                        extra_var.second.first, result)),
+                                    check));
+          assert((!check) && "Candidate allows multiple variable assignments.");
         }
 #ifdef DEBUG
         std::cerr << "Debug: Calling " << cit.function_name
@@ -391,6 +397,7 @@ int main(int argc, char **argv, char **envp) {
 
   std::map<std::string, std::string> user_variables_str =
       contract_get_user_variables();
+  std::set<std::string> overriden_user_variables;
 
   std::string user_variables_param = UserVariables;
   while (!user_variables_param.empty()) {
@@ -417,6 +424,7 @@ int main(int argc, char **argv, char **envp) {
     }
 
     user_variables_str[user_var] = user_val;
+    overriden_user_variables.insert(user_var);
   }
 
   std::map<std::string, std::set<std::string>> optimization_variables_str =
@@ -475,7 +483,9 @@ int main(int argc, char **argv, char **envp) {
   std::map<std::string, std::set<klee::ref<klee::Expr>>::iterator>
       candidate_iterators;
   for (auto &it : optimization_variables) {
-    candidate_iterators[it.first] = it.second.begin();
+    if (!overriden_user_variables.count(it.first)) {
+      candidate_iterators[it.first] = it.second.begin();
+    }
   }
 
 #ifdef DEBUG
@@ -495,9 +505,7 @@ int main(int argc, char **argv, char **envp) {
     std::map<std::string, klee::ref<klee::Expr>> vars = user_variables;
 
     for (auto it : candidate_iterators) {
-      if (!user_variables_str.count(it.first)) {
-        vars[it.first] = *it.second;
-      }
+      vars[it.first] = *it.second;
     }
 
     long cycles = process_candidate(call_path, contract, vars);
@@ -518,11 +526,10 @@ int main(int argc, char **argv, char **envp) {
     }
   } while (pos != candidate_iterators.end());
 
-  if (max_cycles >= 0) {
-    std::cout << max_cycles << std::endl;
-    return 0;
-  } else {
-    std::cerr << "Error: No candidate was SAT." << std::endl;
-    return -1;
+  if (max_cycles < 0) {
+    std::cerr << "Warning: No candidate was SAT." << std::endl;
   }
+
+  std::cout << max_cycles << std::endl;
+  return 0;
 }
