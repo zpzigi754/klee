@@ -74,6 +74,7 @@ int main(int argc, char **argv, char **envp) {
   out.numObjects = objects.size();
   out.objects = objects.data();
 
-  assert(kTest_toFile(&out, OutputFile.c_str()) &&
+  int file_writing_result = kTest_toFile(&out, OutputFile.c_str());
+  assert( file_writing_result &&
          "Error writing output KTEST file.");
 }
