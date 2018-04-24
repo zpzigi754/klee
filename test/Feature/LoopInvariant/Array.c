@@ -7,6 +7,7 @@
 
 int main() {
   int x[3] = {1, 20, 3};
+  klee_possibly_havoc(x, sizeof(x), "x");
   while(klee_induce_invariants() & x[1]) {
     x[1] -- ;
     if (x[0] < 4) {

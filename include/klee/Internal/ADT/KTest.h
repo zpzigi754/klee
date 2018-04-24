@@ -35,6 +35,8 @@ extern "C" {
 
     unsigned numObjects;
     KTestObject *objects;
+    unsigned numHavocs;
+    KTestObject *havocs;
   };
 
   

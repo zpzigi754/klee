@@ -7,6 +7,7 @@
 
 int main() {
   int x = 3;
+  klee_possibly_havoc(&x, sizeof(x), "x");
   while(klee_induce_invariants() & --x) {
     printf("inloop\n");
     // CHECK: inloop

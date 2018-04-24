@@ -10,6 +10,12 @@ int main() {
   int y = 5;
   int z = klee_int("z");
   int w = z;
+
+  klee_possibly_havoc(&x, sizeof(x), "x");
+  klee_possibly_havoc(&y, sizeof(y), "y");
+  klee_possibly_havoc(&z, sizeof(z), "z");
+  klee_possibly_havoc(&w, sizeof(w), "w");
+
   while(klee_induce_invariants()) {
     x -- ;
     if (x < 4) {

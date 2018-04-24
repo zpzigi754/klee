@@ -21,6 +21,10 @@ int main() {
     printf("taking OTHER one");
   }
 
+  klee_possibly_havoc(&x, sizeof(x), "x");
+  klee_possibly_havoc(&y, sizeof(y), "y");
+  klee_possibly_havoc(&z, sizeof(z), "z");
+
   while(klee_induce_invariants() & x--) {
     if (z == 1) {
       printf("z may be 1\n");

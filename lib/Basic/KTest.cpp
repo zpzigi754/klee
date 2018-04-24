@@ -13,7 +13,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#define KTEST_VERSION 3
+#define KTEST_VERSION 4
 #define KTEST_MAGIC_SIZE 5
 #define KTEST_MAGIC "KTEST"
 
@@ -146,6 +146,22 @@ KTest *kTest_fromFile(const char *path) {
       goto error;
   }
 
+  if (!read_uint32(f, &res->numHavocs))
+    goto error;
+  res->havocs = (KTestObject*) calloc(res->numHavocs, sizeof(*res->havocs));
+  if (!res->havocs)
+    goto error;
+  for (i=0; i<res->numHavocs; i++) {
+    KTestObject *o = &res->havocs[i];
+    if (!read_string(f, &o->name))
+      goto error;
+    if (!read_uint32(f, &o->numBytes))
+      goto error;
+    o->bytes = (unsigned char*) malloc(o->numBytes);
+    if (fread(o->bytes, o->numBytes, 1, f)!=1)
+      goto error;
+  }
+
   fclose(f);
 
   return res;
@@ -166,6 +182,16 @@ KTest *kTest_fromFile(const char *path) {
           free(bo->bytes);
       }
       free(res->objects);
+    }
+    if (res->havocs) {
+      for (i=0; i<res->numHavocs; i++) {
+        KTestObject *bo = &res->havocs[i];
+        if (bo->name)
+          free(bo->name);
+        if (bo->bytes)
+          free(bo->bytes);
+      }
+      free(res->havocs);
     }
     free(res);
   }
@@ -210,6 +236,18 @@ int kTest_toFile(KTest *bo, const char *path) {
       goto error;
   }
 
+  if (!write_uint32(f, bo->numHavocs))
+    goto error;
+  for (i=0; i<bo->numHavocs; i++) {
+    KTestObject *o = &bo->havocs[i];
+    if (!write_string(f, o->name))
+      goto error;
+    if (!write_uint32(f, o->numBytes))
+      goto error;
+    if (fwrite(o->bytes, o->numBytes, 1, f)!=1)
+      goto error;
+  }
+
   fclose(f);
 
   return 1;
@@ -223,6 +261,8 @@ unsigned kTest_numBytes(KTest *bo) {
   unsigned i, res = 0;
   for (i=0; i<bo->numObjects; i++)
     res += bo->objects[i].numBytes;
+  for (i=0; i<bo->numHavocs; i++)
+    res += bo->havocs[i].numBytes;
   return res;
 }
 
@@ -236,5 +276,10 @@ void kTest_free(KTest *bo) {
     free(bo->objects[i].bytes);
   }
   free(bo->objects);
+  for (i=0; i<bo->numHavocs; i++) {
+    free(bo->havocs[i].name);
+    free(bo->havocs[i].bytes);
+  }
+  free(bo->havocs);
   free(bo);
 }

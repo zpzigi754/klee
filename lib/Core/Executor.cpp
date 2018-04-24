@@ -3780,6 +3780,20 @@ void Executor::executeMakeSymbolic(ExecutionState &state,
   }
 }
 
+void Executor::executePossiblyHavoc(ExecutionState &state,
+                                    const MemoryObject *mo,
+                                    const std::string &name) {
+  if (replayKTest) {
+    terminateStateOnError(state,
+                          "klee_possibly_havoc does not support replayKTest.",
+                          Unhandled);
+    return;
+  }
+
+  state.addHavocInfo(mo, name);
+}
+
+
 /***/
 
 void Executor::runFunctionAsMain(Function *f,
@@ -3939,7 +3953,11 @@ bool Executor::getSymbolicSolution(const ExecutionState &state,
                                    std::vector< 
                                    std::pair<std::string,
                                    std::vector<unsigned char> > >
-                                   &res) {
+                                   &res,
+                                   std::vector<
+                                   std::pair<std::string,
+                                   std::vector<unsigned char> > >
+                                   havocs) {
   solver->setTimeout(coreSolverTimeout);
 
   ExecutionState tmp(state);
@@ -3974,8 +3992,15 @@ bool Executor::getSymbolicSolution(const ExecutionState &state,
 
   std::vector< std::vector<unsigned char> > values;
   std::vector<const Array*> objects;
+  std::vector<std::string> havoc_names;
   for (unsigned i = 0; i != state.symbolics.size(); ++i)
     objects.push_back(state.symbolics[i].second);
+  for (auto i = state.havocs.begin(); i != state.havocs.end(); ++i) {
+    if (i->second.havoced) {
+      objects.push_back(i->second.value);
+      havoc_names.push_back(i->second.name);
+    }
+  }
   bool success = solver->getInitialValues(tmp, objects, values);
   solver->setTimeout(0);
   if (!success) {
@@ -3984,13 +4009,13 @@ bool Executor::getSymbolicSolution(const ExecutionState &state,
                              ConstantExpr::alloc(0, Expr::Bool));
     return false;
   }
-  
-  for (unsigned i = 0; i != state.symbolics.size(); ++i) {
-    if (!state.symbolics[i].second->name.compare(0, strlen("reset_"), "reset_")) {
-      res.push_back(std::make_pair(state.symbolics[i].second->name, values[i]));
-    } else {
-      res.push_back(std::make_pair(state.symbolics[i].first->name, values[i]));
-    }
+  unsigned i = 0;
+  for (; i != state.symbolics.size(); ++i) {
+    res.push_back(std::make_pair(state.symbolics[i].first->name, values[i]));
+  }
+  for (; i < values.size(); ++i) {
+    int index = i - state.symbolics.size();
+    havocs.push_back(std::make_pair(havoc_names[index], values[i]));
   }
   return true;
 }

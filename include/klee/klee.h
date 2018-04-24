@@ -261,6 +261,8 @@ extern "C" {
 
   void klee_dump_constraints();
 
+  void klee_possibly_havoc(void* ptr, int width, char* name);
+
 #ifdef __cplusplus
 }
 #endif

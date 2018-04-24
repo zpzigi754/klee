@@ -7,8 +7,11 @@
 
 int main() {
   int x[4] = {1, 2, 3, 4};
+  int idx;
+  klee_possibly_havoc(&x, sizeof(x), "x");
+  klee_possibly_havoc(&idx, sizeof(idx), "idx");
   while(klee_induce_invariants() & x[1]) {
-    int idx = x[1];//2, 1, 0
+    idx = x[1];//2, 1, 0
     klee_assume(0 <= idx);
     klee_assume(idx < 3);
     x[idx] = 0;
