@@ -13,7 +13,7 @@ import os
 import struct
 import sys
 
-version_no=3
+version_no=4
 
 class KTestError(Exception):
     pass
@@ -54,18 +54,27 @@ class KTest:
             bytes = f.read(size)
             objects.append( (name,bytes) )
 
+        numHavocs, = struct.unpack('>i', f.read(4))
+        havocs = []
+        for i in range(numHavocs):
+            size, = struct.unpack('>i', f.read(4))
+            name = f.read(size)
+            size, = struct.unpack('>i', f.read(4))
+            bytes = f.read(size)
+            havocs.append( (name,bytes) )
         # Create an instance
-        b = KTest(version, args, symArgvs, symArgvLen, objects)
+        b = KTest(version, args, symArgvs, symArgvLen, objects, havocs)
         # Augment with extra filename field
         b.filename = path
         return b
     
-    def __init__(self, version, args, symArgvs, symArgvLen, objects):
+    def __init__(self, version, args, symArgvs, symArgvLen, objects, havocs):
         self.version = version
         self.symArgvs = symArgvs
         self.symArgvLen = symArgvLen
         self.args = args
         self.objects = objects
+        self.havocs = havocs
 
         # add a field that represents the name of the program used to
         # generate this .ktest file:
@@ -114,6 +123,19 @@ def main(args):
                 print('object %4d: data: %r' % (i, struct.unpack('i',str)[0]))
             else:
                 print('object %4d: data: %r' % (i, str))
+        print('num havocs: %r' % len(b.havocs))
+        for i,(name,data) in enumerate(b.havocs):
+            if opts.trimZeros:
+                str = trimZeros(data)
+            else:
+                str = data
+
+            print('havoc %4d: name: %r' % (i, name))
+            print('havoc %4d: size: %r' % (i, len(data)))
+            if opts.writeInts and len(data) == 4: 
+                print('havoc %4d: data: %r' % (i, struct.unpack('i',str)[0]))
+            else:
+                print('havoc %4d: data: %r' % (i, str))
         if file != args[-1]:
             print()
 
