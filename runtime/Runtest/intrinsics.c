@@ -22,8 +22,19 @@
 
 #include "klee/Internal/ADT/KTest.h"
 
+#define MAX_HAVOCED_PLACES (1048576)
+
+struct havoced_place {
+  char* name;
+  void* ptr;
+  int width;
+};
+
 static KTest *testData = 0;
 static unsigned testPosition = 0;
+struct havoced_place havoced_places[MAX_HAVOCED_PLACES];
+unsigned next_havoced_place = 0;
+
 
 static unsigned char rand_byte(void) {
   unsigned x = rand();
@@ -45,6 +56,28 @@ static void report_internal_error(const char *msg, ...) {
   if (testErrorsNonFatal) {
     fprintf(stderr, "KLEE_RUN_TEST_ERROR: Forcing execution to continue\n");
   } else {
+    exit(1);
+  }
+}
+
+static void init_test_data() {
+  assert(!testData);
+  char tmp[256];
+  char *name = getenv("KTEST_FILE");
+
+  if (!name) {
+    fprintf(stdout, "KLEE-RUNTIME: KTEST_FILE not set, please enter .ktest path: ");
+    fflush(stdout);
+    name = tmp;
+    if (!fgets(tmp, sizeof tmp, stdin) || !strlen(tmp)) {
+      fprintf(stderr, "KLEE-RUNTIME: cannot replay, no KTEST_FILE or user input\n");
+      exit(1);
+    }
+    tmp[strlen(tmp)-1] = '\0'; /* kill newline */
+  }
+  testData = kTest_fromFile(name);
+  if (!testData) {
+    fprintf(stderr, "KLEE-RUNTIME: unable to open .ktest file\n");
     exit(1);
   }
 }
@@ -78,24 +111,7 @@ void klee_make_symbolic(void *array, size_t nbytes, const char *name) {
   }
 
   if (!testData) {
-    char tmp[256];
-    char *name = getenv("KTEST_FILE");
-
-    if (!name) {
-      fprintf(stdout, "KLEE-RUNTIME: KTEST_FILE not set, please enter .ktest path: ");
-      fflush(stdout);
-      name = tmp;
-      if (!fgets(tmp, sizeof tmp, stdin) || !strlen(tmp)) {
-        fprintf(stderr, "KLEE-RUNTIME: cannot replay, no KTEST_FILE or user input\n");
-        exit(1);
-      }
-      tmp[strlen(tmp)-1] = '\0'; /* kill newline */
-    }
-    testData = kTest_fromFile(name);
-    if (!testData) {
-      fprintf(stderr, "KLEE-RUNTIME: unable to open .ktest file\n");
-      exit(1);
-    }
+    init_test_data();
   }
 
   for (;; ++testPosition) {
@@ -129,6 +145,41 @@ void klee_make_symbolic(void *array, size_t nbytes, const char *name) {
     }
   }
 }
+
+void klee_possibly_havoc(void* ptr, int width, char* name) {
+  assert(next_havoced_place < MAX_HAVOCED_PLACES);
+  havoced_places[next_havoced_place].name = name;
+  havoced_places[next_havoced_place].ptr = ptr;
+  havoced_places[next_havoced_place].width = width;
+  ++next_havoced_place;
+  assert(next_havoced_place < MAX_HAVOCED_PLACES);
+}
+
+int klee_induce_invariants() {
+  //TODO: support partial havoc (only selected bytes of an array)
+  if (!testData) {
+    init_test_data();
+  }
+
+  for (unsigned i = 0; i < testData->numHavocs; ++i) {
+    char* name = testData->havocs[i].name;
+    int found = 0;
+    for (unsigned j = 0; j <= next_havoced_place; ++j) {
+      if (strcmp(name, havoced_places[j].name) == 0) {
+        found = 1;
+        printf("havocing: %s\n", name);
+        assert(testData->havocs[i].numBytes == havoced_places[j].width);
+        memcpy(havoced_places[j].ptr,
+               testData->havocs[i].bytes,
+               havoced_places[j].width);
+      }
+    }
+    assert(found);
+  }
+
+  return 1;
+}
+
 
 void klee_silent_exit(int x) {
   exit(x);
@@ -241,7 +292,6 @@ void klee_trace_param_ptr(void* ptr, int width, const char* name) {}
 
   void klee_forget_all(){}
 
-int klee_induce_invariants(){ return 1; }
 
   void klee_forbid_access(void* ptr, int width, char* message){}
   void klee_allow_access(void* ptr, int width){}
