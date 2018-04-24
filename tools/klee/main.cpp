@@ -449,7 +449,8 @@ void KleeHandler::processTestCase(const ExecutionState &state,
                                   const char *errorSuffix) {
   if (!NoOutput) {
     std::vector< std::pair<std::string, std::vector<unsigned char> > > out;
-    bool success = m_interpreter->getSymbolicSolution(state, out);
+    std::vector< std::pair<std::string, std::vector<unsigned char> > > havocs;
+    bool success = m_interpreter->getSymbolicSolution(state, out, havocs);
 
     if (!success)
       klee_warning("unable to get symbolic solution, losing test case");
@@ -474,6 +475,17 @@ void KleeHandler::processTestCase(const ExecutionState &state,
         o->bytes = new unsigned char[o->numBytes];
         assert(o->bytes);
         std::copy(out[i].second.begin(), out[i].second.end(), o->bytes);
+      }
+      b.numHavocs = havocs.size();
+      b.havocs = new KTestObject[b.numHavocs];
+      assert(b.havocs);
+      for (unsigned i=0; i<b.numHavocs; i++) {
+        KTestObject *o = &b.havocs[i];
+        o->name = const_cast<char*>(havocs[i].first.c_str());
+        o->numBytes = havocs[i].second.size();
+        o->bytes = new unsigned char[o->numBytes];
+        assert(o->bytes);
+        std::copy(havocs[i].second.begin(), havocs[i].second.end(), o->bytes);
       }
 
       if (!kTest_toFile(&b, getOutputFilename(getTestFilename("ktest", id)).c_str())) {

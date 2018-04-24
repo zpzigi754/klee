@@ -149,6 +149,12 @@ struct CallInfo {
   SymbolSet computeRetSymbolSet() const;
 };
 
+struct HavocInfo {
+  std::string name;
+  bool havoced;
+  const Array* value;
+};
+
 class ExecutionState;
 
 /// @brief LoopInProcess keeps all the necessary information for
@@ -281,6 +287,10 @@ public:
   // FIXME: Move to a shared list structure (not critical).
   std::vector<std::pair<const MemoryObject *, const Array *> > symbolics;
 
+  /// @brief The list of possibly havoced memory locations with their names
+  ///  and values placed at the last havoc event.
+  std::map<const MemoryObject *, HavocInfo> havocs;
+
   /// @brief Set of used array names for this state.  Used to avoid collisions.
   std::set<std::string> arrayNames;
 
@@ -331,6 +341,8 @@ public:
   ~ExecutionState();
 
   ExecutionState *branch();
+
+  void addHavocInfo(const MemoryObject *mo, const std::string &name);
 
   void pushFrame(KInstIterator caller, KFunction *kf);
   void popFrame();

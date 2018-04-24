@@ -329,6 +329,9 @@ private:
   void executeMakeSymbolic(ExecutionState &state, const MemoryObject *mo,
                            const std::string &name);
 
+  void executePossiblyHavoc(ExecutionState &state, const MemoryObject *mo,
+                            const std::string &name);
+
   /// Create a new state where each input condition has been added as
   /// a constraint and return the results. The input state is included
   /// as one of the results. Note that the output vector may included
@@ -536,7 +539,11 @@ public:
                                    std::vector< 
                                    std::pair<std::string,
                                    std::vector<unsigned char> > >
-                                   &res);
+                                   &res,
+                                   std::vector<
+                                   std::pair<std::string,
+                                   std::vector<unsigned char> > >
+                                   havocs);
 
   virtual void getCoveredLines(const ExecutionState &state,
                                std::map<const std::string*, std::set<unsigned> > &res);

@@ -12,6 +12,11 @@ int main() {
 
   int i = 20;
 
+  klee_possibly_havoc(&x, sizeof(x), "x");
+  klee_possibly_havoc(&y, sizeof(y), "y");
+  klee_possibly_havoc(&z, sizeof(z), "z");
+  klee_possibly_havoc(&i, sizeof(i), "i");
+
   while (klee_induce_invariants() & i--) {
     x = 10;
     while(--x) {
