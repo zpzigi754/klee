@@ -15,6 +15,7 @@
 #include "klee/ExecutionState.h"
 
 #include "klee/Internal/Module/Cell.h"
+#include "klee/Internal/Support/ErrorHandling.h"
 #include "klee/Internal/Module/InstructionInfoTable.h"
 #include "klee/Internal/Module/KInstruction.h"
 #include "klee/Internal/Module/KModule.h"
@@ -1428,6 +1429,11 @@ bool klee::updateDiffMask(StateByteMask* mask,
     std::pair<std::map<const MemoryObject *, BitArray *>::iterator, bool>
       insRez = mask->insert
       (std::pair<const MemoryObject *, BitArray *>(obj, 0));
+
+    if (state.havocs.find(obj) == state.havocs.end()) {
+      klee_error("Unexpected memory location changed its value during invariant analysis.");
+    }
+
     if (insRez.second) insRez.first->second =
                          new BitArray(obj->size);
     BitArray *bytes = insRez.first->second;
