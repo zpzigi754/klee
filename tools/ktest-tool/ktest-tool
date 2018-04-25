@@ -54,14 +54,15 @@ class KTest:
             bytes = f.read(size)
             objects.append( (name,bytes) )
 
-        numHavocs, = struct.unpack('>i', f.read(4))
         havocs = []
-        for i in range(numHavocs):
-            size, = struct.unpack('>i', f.read(4))
-            name = f.read(size)
-            size, = struct.unpack('>i', f.read(4))
-            bytes = f.read(size)
-            havocs.append( (name,bytes) )
+        if version >= 4:
+            numHavocs, = struct.unpack('>i', f.read(4))
+            for i in range(numHavocs):
+                size, = struct.unpack('>i', f.read(4))
+                name = f.read(size)
+                size, = struct.unpack('>i', f.read(4))
+                bytes = f.read(size)
+                havocs.append( (name,bytes) )
         # Create an instance
         b = KTest(version, args, symArgvs, symArgvLen, objects, havocs)
         # Augment with extra filename field
