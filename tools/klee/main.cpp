@@ -1314,6 +1314,7 @@ static const char *modelledExternals[] = {
   "klee_trace_param_u16",
 
   // special functions
+  "_stdio_init",
   "_assert",
   "__assert_fail",
   "__assert_rtn",
@@ -1387,6 +1388,7 @@ static const char *modelledExternals[] = {
   "__ubsan_handle_sub_overflow",
   "__ubsan_handle_mul_overflow",
   "__ubsan_handle_divrem_overflow",
+  "__ubsan_handle_negate_overflow"
 };
 // Symbols we aren't going to warn about
 static const char *dontCareExternals[] = {
