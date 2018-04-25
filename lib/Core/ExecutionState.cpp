@@ -26,6 +26,7 @@
 
 #include "Memory.h"
 #include "llvm/IR/Function.h"
+#include "llvm/DebugInfo.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -129,13 +130,13 @@ ExecutionState::~ExecutionState() {
 
 ExecutionState::ExecutionState(const ExecutionState& state):
     fnAliases(state.fnAliases),
+    readsIntercepts(state.readsIntercepts),
+    writesIntercepts(state.writesIntercepts),
     pc(state.pc),
     prevPC(state.prevPC),
     stack(state.stack),
     incomingBBIndex(state.incomingBBIndex),
 
-    readsIntercepts(state.readsIntercepts),
-    writesIntercepts(state.writesIntercepts),
 
     addressSpace(state.addressSpace),
     loopInProcess(state.loopInProcess) ,
@@ -1434,19 +1435,43 @@ bool klee::updateDiffMask(StateByteMask* mask,
     if (state.havocs.find(obj) == state.havocs.end()) {
       ref<Expr> firstByteRef = refOs->read8(0, true);
       ref<Expr> firstByte = os->read8(0, true);
-      fprintf(stderr, "value before: ");
+      fprintf(stderr, "First byte before: ");
       fflush(stderr);
       firstByteRef->dump();
-      fprintf(stderr, "value after: ");
+      fprintf(stderr, "First byte after: ");
       fflush(stderr);
       firstByte->dump();
+      fprintf(stderr, "Type: ");
+      fflush(stderr);
+      obj->allocSite->getType()->dump();
+      fprintf(stderr, "\n");
+      std::string metadata;
+      if (isa<llvm::Instruction>(obj->allocSite)) {
+        const llvm::Instruction *inst = dyn_cast<llvm::Instruction>(obj->allocSite);
+        if (llvm::MDNode *node = inst->getMetadata("dbg")) {
+          llvm::DILocation loc(node);
+          metadata = loc.getDirectory().str() + "/" +
+            loc.getFilename().str() + ":";
+          metadata += loc.getLineNumber();
+        } else {
+          metadata = "(unknown)";
+        }
+      } else {
+        metadata = "(not an instruciton)";
+      }
       klee_error("Unexpected memory location changed its value during invariant analysis:\n"
-                 "  name: %s\n  location: %s\n  global: %s\n  size: %u\n  address: 0x%lx",
+                 "  name: %s\n  location: %s\n"
+                 "  local: %s\n  global: %s\n"
+                 "  fixed: %s\n  size: %u\n"
+                 "  address: 0x%lx\n  metadata: %s",
                  obj->name.c_str(),
                  obj->allocSite->getName().str().c_str(),
+                 obj->isLocal ? "true" : "false",
                  obj->isGlobal ? "true" : "false",
+                 obj->isFixed ? "true" : "false",
                  obj->size,
-                 obj->address);
+                 obj->address,
+                 metadata.c_str());
     }
 
     if (insRez.second) insRez.first->second =
