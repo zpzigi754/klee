@@ -1432,7 +1432,21 @@ bool klee::updateDiffMask(StateByteMask* mask,
       (std::pair<const MemoryObject *, BitArray *>(obj, 0));
 
     if (state.havocs.find(obj) == state.havocs.end()) {
-      klee_error("Unexpected memory location changed its value during invariant analysis: %s", obj->name.c_str());
+      ref<Expr> firstByteRef = refOs->read8(0, true);
+      ref<Expr> firstByte = os->read8(0, true);
+      fprintf(stderr, "value before: ");
+      fflush(stderr);
+      firstByteRef->dump();
+      fprintf(stderr, "value after: ");
+      fflush(stderr);
+      firstByte->dump();
+      klee_error("Unexpected memory location changed its value during invariant analysis:\n"
+                 "  name: %s\n  location: %s\n  global: %s\n  size: %u\n  address: 0x%lx",
+                 obj->name.c_str(),
+                 obj->allocSite->getName().str().c_str(),
+                 obj->isGlobal ? "true" : "false",
+                 obj->size,
+                 obj->address);
     }
 
     if (insRez.second) insRez.first->second =
