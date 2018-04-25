@@ -1398,6 +1398,11 @@ ExecutionState *LoopInProcess::makeRestartState() {
   return newState;
 }
 
+std::string __attribute__((weak)) numToStr(long long n) {
+  std::stringstream ss;
+  ss << n;
+  return ss.str();
+}
 
 //TODO: move this into not-yet existing LoopAnalysis.cpp
 bool klee::updateDiffMask(StateByteMask* mask,
@@ -1451,8 +1456,8 @@ bool klee::updateDiffMask(StateByteMask* mask,
         if (llvm::MDNode *node = inst->getMetadata("dbg")) {
           llvm::DILocation loc(node);
           metadata = loc.getDirectory().str() + "/" +
-            loc.getFilename().str() + ":";
-          metadata += loc.getLineNumber();
+            loc.getFilename().str() + ":" +
+            numToStr(loc.getLineNumber());
         } else {
           metadata = "(unknown)";
         }
