@@ -146,20 +146,25 @@ KTest *kTest_fromFile(const char *path) {
       goto error;
   }
 
-  if (!read_uint32(f, &res->numHavocs))
-    goto error;
-  res->havocs = (KTestObject*) calloc(res->numHavocs, sizeof(*res->havocs));
-  if (!res->havocs)
-    goto error;
-  for (i=0; i<res->numHavocs; i++) {
-    KTestObject *o = &res->havocs[i];
-    if (!read_string(f, &o->name))
+  if (version >= 4) {
+    if (!read_uint32(f, &res->numHavocs))
       goto error;
-    if (!read_uint32(f, &o->numBytes))
+    res->havocs = (KTestObject*) calloc(res->numHavocs, sizeof(*res->havocs));
+    if (!res->havocs)
       goto error;
-    o->bytes = (unsigned char*) malloc(o->numBytes);
-    if (fread(o->bytes, o->numBytes, 1, f)!=1)
-      goto error;
+    for (i=0; i<res->numHavocs; i++) {
+      KTestObject *o = &res->havocs[i];
+      if (!read_string(f, &o->name))
+        goto error;
+      if (!read_uint32(f, &o->numBytes))
+        goto error;
+      o->bytes = (unsigned char*) malloc(o->numBytes);
+      if (fread(o->bytes, o->numBytes, 1, f)!=1)
+        goto error;
+    }
+  } else {
+    res->numHavocs = 0;
+    res->havocs = NULL;
   }
 
   fclose(f);
