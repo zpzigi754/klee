@@ -164,10 +164,10 @@ int klee_induce_invariants() {
   for (unsigned i = 0; i < testData->numHavocs; ++i) {
     char* name = testData->havocs[i].name;
     int found = 0;
-    for (unsigned j = 0; j <= next_havoced_place; ++j) {
+    for (unsigned j = 0; j < next_havoced_place; ++j) {
       if (strcmp(name, havoced_places[j].name) == 0) {
+        assert(!found);
         found = 1;
-        printf("havocing: %s\n", name);
         assert(testData->havocs[i].numBytes == havoced_places[j].width);
         memcpy(havoced_places[j].ptr,
                testData->havocs[i].bytes,
