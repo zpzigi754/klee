@@ -291,6 +291,10 @@ public:
   ///  and values placed at the last havoc event.
   std::map<const MemoryObject *, HavocInfo> havocs;
 
+  /// @brief The list of registered havoc mem location names, used to guarantee
+  ///  uniqueness of each name.
+  std::set<std::string> havocNames;
+
   /// @brief Set of used array names for this state.  Used to avoid collisions.
   std::set<std::string> arrayNames;
 

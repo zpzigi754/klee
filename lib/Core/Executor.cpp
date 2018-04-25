@@ -3790,6 +3790,12 @@ void Executor::executePossiblyHavoc(ExecutionState &state,
     return;
   }
 
+  unsigned id = 0;
+  std::string uniqueName = name;
+  while (!state.havocNames.insert(uniqueName).second) {
+    uniqueName = name + "_" + llvm::utostr(++id);
+  }
+
   state.addHavocInfo(mo, name);
 }
 
