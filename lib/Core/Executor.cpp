@@ -3957,7 +3957,7 @@ bool Executor::getSymbolicSolution(const ExecutionState &state,
                                    std::vector<
                                    std::pair<std::string,
                                    std::vector<unsigned char> > >
-                                   havocs) {
+                                   &havocs) {
   solver->setTimeout(coreSolverTimeout);
 
   ExecutionState tmp(state);
