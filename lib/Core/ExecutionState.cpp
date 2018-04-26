@@ -174,12 +174,14 @@ ExecutionState::ExecutionState(const ExecutionState& state):
   for(auto it = havocs.begin(); it != havocs.end(); ++it) {
     it->first->refCount++;
   }
+  LOG_LA("Cloning ES " << (void*)this << " from " << (void*)&state);
 }
 
 void ExecutionState::addHavocInfo(const MemoryObject *mo,
                                   const std::string &name) {
   havocs[mo].name = name;
   havocs[mo].havoced = false;
+  havocs[mo].mask = BitArray();
   mo->refCount++;
 }
 
@@ -1040,9 +1042,11 @@ void ExecutionState::updateLoopAnalysisForBlockTransfer
 }
 
 void ExecutionState::terminateState(ExecutionState** replace) {
+  LOG_LA("Terminating: " << (void*)this);
   if (!loopInProcess.isNull()) {
     *replace = finishLoopRound(stack.back().kf);
     loopInProcess = 0;
+    LOG_LA(" - replacing with: " <<(void*)(*replace));
   }
 }
 
@@ -1346,6 +1350,7 @@ unsigned countBitsSet(const BitArray *arr, unsigned size) {
 
 ExecutionState *LoopInProcess::makeRestartState() {
   ExecutionState *newState = restartState->branch();
+  LOG_LA("Making restart state " << (void*)newState <<" from " <<(void*)restartState);
   for (std::map<const MemoryObject *, BitArray *>::iterator
          i = changedBytes.begin(),
          e = changedBytes.end();
@@ -1385,6 +1390,14 @@ ExecutionState *LoopInProcess::makeRestartState() {
     // Remember the generated value for later reporting in the ktest file.
     havoc_info->second.value = array;
     havoc_info->second.havoced = true;
+    havoc_info->second.mask = BitArray(*bytes, bytes->size());
+    LOG_LA("Adding havoc here: " << havoc_info->second.name << " in: " << (void*)newState);
+    // printf("mask for %s: ", havoc_info->second.name.c_str());
+    // for (unsigned i = 0; i < bytes->size(); ++i) {
+    //   printf("%s", bytes->get(i) ? "1" : "0");
+    // }
+    // printf("\n");
+    // fflush(stdout);
 
     // Do not record this symbol, as it was not generated with klee_make_symbolic.
     //newState->symbolics.push_back(std::make_pair(mo, array));

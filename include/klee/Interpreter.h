@@ -14,6 +14,8 @@
 #include <map>
 #include <set>
 
+#include "klee/util/BitArray.h"
+
 struct KTest;
 
 namespace llvm {
@@ -45,6 +47,12 @@ public:
                                const char *err, 
                                const char *suffix) = 0;
   virtual void processCallPath(const ExecutionState &state) = 0;
+};
+
+struct HavocedLocation {
+  std::string name;
+  std::vector<unsigned char> value;
+  BitArray mask;
 };
 
 class Interpreter {
@@ -156,10 +164,7 @@ public:
                                    std::pair<std::string,
                                    std::vector<unsigned char> > >
                                    &res,
-                                   std::vector<
-                                   std::pair<std::string,
-                                   std::vector<unsigned char> > >
-                                   &havocs) = 0;
+                                   std::vector<HavocedLocation> &havocs) = 0;
 
   virtual void getCoveredLines(const ExecutionState &state,
                                std::map<const std::string*, std::set<unsigned> > &res) = 0;

@@ -152,6 +152,7 @@ struct CallInfo {
 struct HavocInfo {
   std::string name;
   bool havoced;
+  BitArray mask;
   const Array* value;
 };
 

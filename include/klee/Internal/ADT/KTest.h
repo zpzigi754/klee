@@ -10,6 +10,8 @@
 #ifndef __COMMON_KTEST_H__
 #define __COMMON_KTEST_H__
 
+#include <stdint.h>
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -20,6 +22,14 @@ extern "C" {
     char *name;
     unsigned numBytes;
     unsigned char *bytes;
+  };
+
+  typedef struct KTestHavocedLocation KTestHavocedLocation;
+  struct KTestHavocedLocation {
+    char *name;
+    unsigned numBytes;
+    unsigned char *bytes;
+    uint32_t *mask;
   };
   
   typedef struct KTest KTest;
@@ -36,7 +46,7 @@ extern "C" {
     unsigned numObjects;
     KTestObject *objects;
     unsigned numHavocs;
-    KTestObject *havocs;
+    KTestHavocedLocation *havocs;
   };
 
   
