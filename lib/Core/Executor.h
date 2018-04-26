@@ -540,10 +540,7 @@ public:
                                    std::pair<std::string,
                                    std::vector<unsigned char> > >
                                    &res,
-                                   std::vector<
-                                   std::pair<std::string,
-                                   std::vector<unsigned char> > >
-                                   &havocs);
+                                   std::vector<HavocedLocation> &havocs);
 
   virtual void getCoveredLines(const ExecutionState &state,
                                std::map<const std::string*, std::set<unsigned> > &res);

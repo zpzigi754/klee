@@ -62,7 +62,9 @@ class KTest:
                 name = f.read(size)
                 size, = struct.unpack('>i', f.read(4))
                 bytes = f.read(size)
-                havocs.append( (name,bytes) )
+                mask_size = (size + 31)/32*4
+                mask = f.read(mask_size)
+                havocs.append( (name,bytes,mask) )
         # Create an instance
         b = KTest(version, args, symArgvs, symArgvLen, objects, havocs)
         # Augment with extra filename field
@@ -125,7 +127,7 @@ def main(args):
             else:
                 print('object %4d: data: %r' % (i, str))
         print('num havocs: %r' % len(b.havocs))
-        for i,(name,data) in enumerate(b.havocs):
+        for i,(name,data,mask) in enumerate(b.havocs):
             if opts.trimZeros:
                 str = trimZeros(data)
             else:
@@ -133,6 +135,7 @@ def main(args):
 
             print('havoc %4d: name: %r' % (i, name))
             print('havoc %4d: size: %r' % (i, len(data)))
+            print('havoc %4d: mask: %r' % (i, mask))
             if opts.writeInts and len(data) == 4: 
                 print('havoc %4d: data: %r' % (i, struct.unpack('i',str)[0]))
             else:

@@ -449,7 +449,7 @@ void KleeHandler::processTestCase(const ExecutionState &state,
                                   const char *errorSuffix) {
   if (!NoOutput) {
     std::vector< std::pair<std::string, std::vector<unsigned char> > > out;
-    std::vector< std::pair<std::string, std::vector<unsigned char> > > havocs;
+    std::vector< HavocedLocation > havocs;
     bool success = m_interpreter->getSymbolicSolution(state, out, havocs);
 
     if (!success)
@@ -477,15 +477,29 @@ void KleeHandler::processTestCase(const ExecutionState &state,
         std::copy(out[i].second.begin(), out[i].second.end(), o->bytes);
       }
       b.numHavocs = havocs.size();
-      b.havocs = new KTestObject[b.numHavocs];
+      b.havocs = new KTestHavocedLocation[b.numHavocs];
       assert(b.havocs);
       for (unsigned i=0; i<b.numHavocs; i++) {
-        KTestObject *o = &b.havocs[i];
-        o->name = const_cast<char*>(havocs[i].first.c_str());
-        o->numBytes = havocs[i].second.size();
+        KTestHavocedLocation *o = &b.havocs[i];
+        o->name = const_cast<char*>(havocs[i].name.c_str());
+        o->numBytes = havocs[i].value.size();
         o->bytes = new unsigned char[o->numBytes];
         assert(o->bytes);
-        std::copy(havocs[i].second.begin(), havocs[i].second.end(), o->bytes);
+        std::copy(havocs[i].value.begin(), havocs[i].value.end(), o->bytes);
+        unsigned mask_size = (o->numBytes + 31)/32*4;
+        assert(mask_size <= havocs[i].mask.size());
+        o->mask = new uint32_t[mask_size/sizeof(uint32_t)];
+        assert(o->mask);
+        memcpy(o->mask, havocs[i].mask.get_bits(), mask_size);
+        // printf("dumping mask for %s: ", o->name);
+        // for (unsigned i = 0; i < mask_size/4*32; ++i) {
+        //   uint32_t word = i / 32;
+        //   uint32_t bit_id = (i - word * 32);
+        //   uint32_t bit_mask = 1 << bit_id;
+        //   printf("%s", (bit_mask & o->mask[word]) ? "1" : "0");
+        // }
+        // printf("\n");
+        // fflush(stdout);
       }
 
       if (!kTest_toFile(&b, getOutputFilename(getTestFilename("ktest", id)).c_str())) {
