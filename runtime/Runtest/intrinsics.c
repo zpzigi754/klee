@@ -27,7 +27,7 @@
 struct havoced_place {
   char* name;
   void* ptr;
-  int width;
+  unsigned width;
 };
 
 static KTest *testData = 0;
@@ -147,7 +147,19 @@ void klee_make_symbolic(void *array, size_t nbytes, const char *name) {
 }
 
 void klee_possibly_havoc(void* ptr, int width, char* name) {
+  int reuse_count = 0;
+  unsigned i;
   assert(next_havoced_place < MAX_HAVOCED_PLACES);
+  for (i = 0; i < next_havoced_place; ++i) {
+    if (0 == strcmp(havoced_places[i].name, name)) {
+      ++reuse_count;
+    }
+  }
+  if (0 < reuse_count) {
+    //TODO: generate a new name in the form of <name>_<reuse_count>,
+    // matching the klee convention.
+    assert(0 && "not supported");
+  }
   havoced_places[next_havoced_place].name = name;
   havoced_places[next_havoced_place].ptr = ptr;
   havoced_places[next_havoced_place].width = width;
@@ -156,7 +168,7 @@ void klee_possibly_havoc(void* ptr, int width, char* name) {
 }
 
 int klee_induce_invariants() {
-  unsigned i, j;
+  unsigned i, j, byte;
 
   //TODO: support partial havoc (only selected bytes of an array)
   if (!testData) {
@@ -171,9 +183,13 @@ int klee_induce_invariants() {
         assert(!found);
         found = 1;
         assert(testData->havocs[i].numBytes == havoced_places[j].width);
-        memcpy(havoced_places[j].ptr,
-               testData->havocs[i].bytes,
-               havoced_places[j].width);
+        for (byte = 0; byte < testData->havocs[i].numBytes; ++byte) {
+          uint32_t byte_byte = byte/32;
+          uint32_t selector = 1 << (byte - byte_byte*32);
+          if (testData->havocs[i].mask[byte_byte] & selector) {
+            ((uint8_t*)(havoced_places[j].ptr))[byte_byte] = testData->havocs[i].bytes[byte_byte];
+          }
+        }
       }
     }
     assert(found);
