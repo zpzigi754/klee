@@ -4016,7 +4016,7 @@ bool Executor::getSymbolicSolution(const ExecutionState &state,
   }
   unsigned i = 0;
   for (; i != state.symbolics.size(); ++i) {
-    res.push_back(std::make_pair(state.symbolics[i].first->name, values[i]));
+    res.push_back(std::make_pair(objects[i]->name, values[i]));
   }
   for (; i < values.size(); ++i) {
     int index = i - state.symbolics.size();
