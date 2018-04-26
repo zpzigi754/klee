@@ -468,9 +468,27 @@ void KleeHandler::processTestCase(const ExecutionState &state,
       b.numObjects = out.size();
       b.objects = new KTestObject[b.numObjects];
       assert(b.objects);
+      std::string *names = new std::string[b.numObjects];
       for (unsigned i=0; i<b.numObjects; i++) {
         KTestObject *o = &b.objects[i];
-        o->name = const_cast<char*>(out[i].first.c_str());
+        // Drop the '..._1' suffix
+        std::string name = out[i].first;
+        size_t last_underscore = out[i].first.rfind("_");
+        if (last_underscore != std::string::npos) {
+          bool all_digits = true;
+          for (unsigned j = last_underscore + 1; j < name.size(); ++j) {
+            if ('0' <= name[j] && name[j] <= '9') { //fine
+            } else {
+              all_digits = false;
+              break;
+            }
+          }
+          if (all_digits) {
+            name = name.substr(0, last_underscore);
+          }
+        }
+        names[i] = name;
+        o->name = const_cast<char*>(names[i].c_str());
         o->numBytes = out[i].second.size();
         o->bytes = new unsigned char[o->numBytes];
         assert(o->bytes);
@@ -518,6 +536,7 @@ void KleeHandler::processTestCase(const ExecutionState &state,
       for (unsigned i=0; i<b.numObjects; i++)
         delete[] b.objects[i].bytes;
       delete[] b.objects;
+      delete[] names;
     }
 
     if (errorMessage) {
