@@ -156,15 +156,17 @@ void klee_possibly_havoc(void* ptr, int width, char* name) {
 }
 
 int klee_induce_invariants() {
+  unsigned i, j;
+
   //TODO: support partial havoc (only selected bytes of an array)
   if (!testData) {
     init_test_data();
   }
 
-  for (unsigned i = 0; i < testData->numHavocs; ++i) {
+  for (i = 0; i < testData->numHavocs; ++i) {
     char* name = testData->havocs[i].name;
     int found = 0;
-    for (unsigned j = 0; j < next_havoced_place; ++j) {
+    for (j = 0; j < next_havoced_place; ++j) {
       if (strcmp(name, havoced_places[j].name) == 0) {
         assert(!found);
         found = 1;
