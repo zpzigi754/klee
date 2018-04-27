@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+TRACES_DIR=${1:-klee-last}
+shift || true
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 function stitch_traces {
@@ -17,16 +20,14 @@ function stitch_traces {
 
     parallel "echo -n \$(basename {} .call_path)' '; \
               $SCRIPT_DIR/../build/bin/stitch-perf-contract \
-                  -use-forked-solver=false \
-                  -contract $SCRIPT_DIR/../../vigor/perf-contracts/perf-contracts.so \
+                  -contract $SCRIPT_DIR/../../vnds/perf-contracts/perf-contracts.so \
                   --user-vars \"$USER_VAR_STR\" \
-                  {} 2>/dev/null" ::: traces/*.call_path > traces/stateful-perf.txt
+                  {} 2>/dev/null" ::: $TRACES_DIR/*.call_path > $TRACES_DIR/stateful-perf.txt
   else
     parallel "echo -n \$(basename {} .call_path)' '; \
               $SCRIPT_DIR/../build/bin/stitch-perf-contract \
-                  -use-forked-solver=false \
-                  -contract $SCRIPT_DIR/../../vigor/perf-contracts/perf-contracts.so \
-                  {} 2>/dev/null" ::: traces/*.call_path > traces/stateful-perf.txt
+                  -contract $SCRIPT_DIR/../../vnds/perf-contracts/perf-contracts.so \
+                  {} 2>/dev/null" ::: $TRACES_DIR/*.call_path > $TRACES_DIR/stateful-perf.txt
   fi
 
   awk '
@@ -42,7 +43,7 @@ function stitch_traces {
     for (trace in totals) {
       print totals[trace];
     }
-  }' traces/stateful-perf.txt traces/stateless-perf.txt \
+  }' $TRACES_DIR/stateful-perf.txt $TRACES_DIR/stateless-perf.txt \
     | sort -n | tail -n 1
 }
 
