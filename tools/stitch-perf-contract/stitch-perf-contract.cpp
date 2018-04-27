@@ -244,6 +244,7 @@ long process_candidate(call_path_t *call_path, void *contract,
 #endif
 
   klee::Solver *solver = klee::createCoreSolver(klee::STP_SOLVER);
+  assert(solver);
   solver = createCexCachingSolver(solver);
   solver = createCachingSolver(solver);
   solver = createIndependentSolver(solver);
@@ -251,6 +252,26 @@ long process_candidate(call_path_t *call_path, void *contract,
   klee::ConstraintManager constraints = call_path->constraints;
 
   klee::ExprBuilder *exprBuilder = klee::createDefaultExprBuilder();
+  for (auto extra_var : call_path->initial_extra_vars) {
+    std::string initial_name = "initial_" + extra_var.first;
+
+    assert(call_path->arrays.count(initial_name));
+    const klee::Array *array = call_path->arrays[initial_name];
+    klee::UpdateList ul(array, 0);
+    klee::ref<klee::Expr> read_expr =
+        exprBuilder->Read(ul, exprBuilder->Constant(0, klee::Expr::Int32));
+    for (unsigned offset = 1; offset < array->getSize(); offset++) {
+      read_expr = exprBuilder->Concat(
+          exprBuilder->Read(ul,
+                            exprBuilder->Constant(offset, klee::Expr::Int32)),
+          read_expr);
+    }
+    klee::ref<klee::Expr> eq_expr =
+        exprBuilder->Eq(read_expr, extra_var.second);
+
+    constraints.addConstraint(eq_expr);
+  }
+
   for (auto var : vars) {
     if (call_path->initial_extra_vars.count(var.first)) {
       klee::ref<klee::Expr> eq_expr =
@@ -258,11 +279,15 @@ long process_candidate(call_path_t *call_path, void *contract,
 
       klee::Query sat_query(constraints, eq_expr);
       bool result = false;
-      assert(solver->mayBeTrue(sat_query, result));
+      bool success = solver->mayBeTrue(sat_query, result);
+      assert(success);
 
       if (!result) {
 #ifdef DEBUG
         std::cerr << "Debug: Candidate is trivially UNSAT." << std::endl;
+        eq_expr->print(llvm::errs());
+        llvm::errs().flush();
+        std::cerr << std::endl;
 #endif
         return -1;
       }
@@ -285,6 +310,10 @@ long process_candidate(call_path_t *call_path, void *contract,
 
   long cycles = 0;
   for (auto cit : call_path->calls) {
+#ifdef DEBUG
+    std::cerr << "Debug: Processing call to " << cit.function_name << std::endl;
+#endif
+
     if (!contract_has_contract(cit.function_name)) {
       std::cerr << "Warning: No contract for function: " << cit.function_name
                 << ". Ignoring." << std::endl;
@@ -321,7 +350,8 @@ long process_candidate(call_path_t *call_path, void *contract,
                             subcontract_constraints[std::make_pair(
                                 cit.function_name, sub_contract_idx)]);
       bool result = false;
-      assert(solver->mayBeTrue(sat_query, result));
+      bool success = solver->mayBeTrue(sat_query, result);
+      assert(success);
 
       if (result) {
         assert(!found_subcontract && "Multiple subcontracts match.");
@@ -331,14 +361,16 @@ long process_candidate(call_path_t *call_path, void *contract,
         for (auto extra_var : cit.extra_vars) {
           klee::Query expr_query(constraints, extra_var.second.first);
           klee::ref<klee::ConstantExpr> result;
-          assert(solver->getValue(expr_query, result));
+          success = solver->getValue(expr_query, result);
+          assert(success);
 
           variables[extra_var.first] = result->getLimitedValue();
 
           bool check = true;
-          assert(solver->mayBeFalse(expr_query.withExpr(exprBuilder->Eq(
-                                        extra_var.second.first, result)),
-                                    check));
+          success = solver->mayBeFalse(expr_query.withExpr(exprBuilder->Eq(
+                                       extra_var.second.first, result)),
+                                       check);
+          assert(success);
           assert((!check) && "Candidate allows multiple variable assignments.");
         }
 #ifdef DEBUG
@@ -350,8 +382,10 @@ long process_candidate(call_path_t *call_path, void *contract,
         }
 #endif
 
-        cycles += contract_get_sub_contract_performance(
+        long performance = contract_get_sub_contract_performance(
             cit.function_name, sub_contract_idx, variables);
+        assert(performance >= 0);
+        cycles += performance;
       }
     }
     if (!found_subcontract) {
