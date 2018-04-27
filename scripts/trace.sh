@@ -2,19 +2,18 @@
 
 set -euo pipefail
 
+TRACE_DIR=${1:-klee-last}
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-for KTEST in traces/*.ktest; do
-  DEHAVOCED_KTEST="$KTEST.dehavoced"
+for KTEST in $TRACE_DIR/*.ktest; do
   TRACE="${KTEST%.*}.instructions"
 
   if [ ! -f "$TRACE" ]; then
     echo "Processing $KTEST -> $TRACE"
 
-    $SCRIPT_DIR/../build/bin/ktest-dehavoc $KTEST $DEHAVOCED_KTEST
-
     export LD_BIND_NOW=1
-    export KTEST_FILE=$DEHAVOCED_KTEST
+    export KTEST_FILE=$KTEST
 
     pin -t $SCRIPT_DIR/../trace-instructions/pin-trace.so -- \
         ./executable -- --wan 1 --lan-dev 0 \
