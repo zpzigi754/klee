@@ -789,13 +789,13 @@ bool dumpExtraPtrSExpr(const CallExtraPtr& cep, llvm::raw_ostream& file) {
       file <<"))\n";
     } else {
       file <<"(Closing ";
-      dumpPointeeOutSExpr(cep.pointee, file);
+      dumpPointeeInSExpr(cep.pointee, file);
       file <<")\n";
     }
   } else {
     if (cep.accessibleOut) {
       file <<"(Opening ";
-      dumpPointeeInSExpr(cep.pointee, file);
+      dumpPointeeOutSExpr(cep.pointee, file);
       file <<")\n";
     } else {
       llvm::errs() <<"The extra pointer must be accessible either at "
