@@ -1,4 +1,4 @@
-PINDIR = $(HOME)/bin/pin
+PINDIR = $(HOME)/pin
 
 default: pin-trace.so
 
