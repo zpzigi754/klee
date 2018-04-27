@@ -184,10 +184,10 @@ int klee_induce_invariants() {
         found = 1;
         assert(testData->havocs[i].numBytes == havoced_places[j].width);
         for (byte = 0; byte < testData->havocs[i].numBytes; ++byte) {
-          uint32_t byte_byte = byte/32;
-          uint32_t selector = 1 << (byte - byte_byte*32);
-          if (testData->havocs[i].mask[byte_byte] & selector) {
-            ((uint8_t*)(havoced_places[j].ptr))[byte_byte] = testData->havocs[i].bytes[byte_byte];
+          uint32_t byte_word = byte/32;
+          uint32_t selector = 1 << (byte - byte_word*32);
+          if (testData->havocs[i].mask[byte_word] & selector) {
+            ((uint8_t*)(havoced_places[j].ptr))[byte] = testData->havocs[i].bytes[byte];
           }
         }
       }
