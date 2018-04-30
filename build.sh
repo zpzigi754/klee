@@ -23,6 +23,7 @@ cd "$KLEE_DIR/build"
                          -DKLEE_UCLIBC_PATH="$KLEE_DIR/../klee-uclibc" \
                          -DENABLE_POSIX_RUNTIME=ON \
                          -DCMAKE_BUILD_TYPE=Debug \
+                         -DENABLE_KLEE_ASSERTS=ON \
                          ..
 
 
