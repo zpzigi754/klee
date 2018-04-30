@@ -243,7 +243,7 @@ long process_candidate(call_path_t *call_path, void *contract,
   }
 #endif
 
-  klee::Solver *solver = klee::createCoreSolver(klee::STP_SOLVER);
+  klee::Solver *solver = klee::createCoreSolver(klee::Z3_SOLVER);
   assert(solver);
   solver = createCexCachingSolver(solver);
   solver = createCachingSolver(solver);
