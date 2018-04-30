@@ -3796,7 +3796,7 @@ void Executor::executePossiblyHavoc(ExecutionState &state,
     uniqueName = name + "_" + llvm::utostr(++id);
   }
 
-  state.addHavocInfo(mo, name);
+  state.addHavocInfo(mo, uniqueName);
 }
 
 
