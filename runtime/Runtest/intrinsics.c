@@ -23,6 +23,7 @@
 #include "klee/Internal/ADT/KTest.h"
 
 #define MAX_HAVOCED_PLACES (1048576)
+#define NUM_LEN (4)
 
 struct havoced_place {
   char* name;
@@ -146,21 +147,54 @@ void klee_make_symbolic(void *array, size_t nbytes, const char *name) {
   }
 }
 
-void klee_possibly_havoc(void* ptr, int width, char* name) {
-  int reuse_count = 0;
+unsigned count_reuse(char* name) {
   unsigned i;
-  assert(next_havoced_place < MAX_HAVOCED_PLACES);
+  int reuse_count = 0;
   for (i = 0; i < next_havoced_place; ++i) {
-    if (0 == strcmp(havoced_places[i].name, name)) {
+    unsigned name_len = strlen(name);
+    unsigned candidate_len = strlen(havoced_places[i].name);
+    // Compare only the prefix, skip the _### suffixes.
+    if (name_len <= candidate_len &&
+        0 == strncmp(name, havoced_places[i].name, name_len)) {
+      unsigned j = name_len;
+      int num_suffix = 1;
+      int non_numerical = 0;
+      if (name_len < candidate_len &&
+          havoced_places[i].name[name_len] != '_') {
+        continue;
+      }
+      for (j = name_len + 1; j < candidate_len; ++j) {
+        if (havoced_places[i].name[j] < '0' || '9' < havoced_places[i].name[j]) {
+          non_numerical = 1;
+          break;
+        }
+      }
+      if (non_numerical) continue;
       ++reuse_count;
     }
   }
+  return reuse_count;
+}
+
+char* allocate_unique_name(char* orig, unsigned reuse_count) {
+  int size = strlen(orig) + 1 + NUM_LEN + 1;
+  char* unique_name = malloc(size);
+  assert(unique_name);
+  snprintf(unique_name, size, "%s_%d", orig, reuse_count);
+  return unique_name;
+}
+
+void klee_possibly_havoc(void* ptr, int width, char* name) {
+  assert(next_havoced_place < MAX_HAVOCED_PLACES);
+  unsigned reuse_count = count_reuse(name);
   if (0 < reuse_count) {
-    //TODO: generate a new name in the form of <name>_<reuse_count>,
-    // matching the klee convention.
-    assert(0 && "not supported");
+    char* unique_name = allocate_unique_name(name, reuse_count);
+    havoced_places[next_havoced_place].name = unique_name;
+    //printf("%s reused: %d times, giving %s\n", name, reuse_count, unique_name);
+  } else {
+    havoced_places[next_havoced_place].name = name;
+    //printf("%s not reused yet\n", name);
   }
-  havoced_places[next_havoced_place].name = name;
   havoced_places[next_havoced_place].ptr = ptr;
   havoced_places[next_havoced_place].width = width;
   ++next_havoced_place;
@@ -178,10 +212,13 @@ int klee_induce_invariants() {
   for (i = 0; i < testData->numHavocs; ++i) {
     char* name = testData->havocs[i].name;
     int found = 0;
+    //printf("name: %s; ", name);
+    //fflush(stdout);
     for (j = 0; j < next_havoced_place; ++j) {
       if (strcmp(name, havoced_places[j].name) == 0) {
         assert(!found);
         found = 1;
+        //printf("%d - %d\n", testData->havocs[i].numBytes, havoced_places[j].width);
         assert(testData->havocs[i].numBytes == havoced_places[j].width);
         for (byte = 0; byte < testData->havocs[i].numBytes; ++byte) {
           uint32_t byte_word = byte/32;
