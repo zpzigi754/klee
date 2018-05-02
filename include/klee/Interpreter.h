@@ -88,8 +88,13 @@ public:
     /// symbolic execution on concrete programs.
     unsigned MakeConcreteSymbolic;
 
+    /// Whether to forgive user the existence of memory locations
+    /// that alter their value during the loop invariant analysis.
+    bool CondoneUndeclaredHavocs;
+
     InterpreterOptions()
-      : MakeConcreteSymbolic(false)
+      : MakeConcreteSymbolic(false),
+        CondoneUndeclaredHavocs(false)
     {}
   };
 

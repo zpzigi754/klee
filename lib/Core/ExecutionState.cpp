@@ -90,7 +90,8 @@ ExecutionState::ExecutionState(KFunction *kf) :
     ptreeNode(0),
     steppedInstructions(0),
     relevantSymbols(),
-    doTrace(true) {
+    doTrace(true),
+    condoneUndeclaredHavocs(false) {
   pushFrame(0, kf);
 }
 
@@ -99,7 +100,8 @@ ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions)
     constraints(assumptions),
     queryCost(0.), ptreeNode(0),
     relevantSymbols(),
-    doTrace(true) {}
+    doTrace(true),
+    condoneUndeclaredHavocs(false) {}
 
 ExecutionState::~ExecutionState() {
   for (unsigned int i=0; i<symbolics.size(); i++)
@@ -164,7 +166,8 @@ ExecutionState::ExecutionState(const ExecutionState& state):
     steppedInstructions(state.steppedInstructions),
     callPath(state.callPath),
     relevantSymbols(state.relevantSymbols),
-    doTrace(state.doTrace)
+    doTrace(state.doTrace),
+    condoneUndeclaredHavocs(state.condoneUndeclaredHavocs)
 {
   for (unsigned int i=0; i<symbolics.size(); i++)
     symbolics[i].first->refCount++;
@@ -1382,22 +1385,19 @@ ExecutionState *LoopInProcess::makeRestartState() {
     }
 
     auto havoc_info = newState->havocs.find(mo);
-    if (havoc_info == newState->havocs.end()) {
+    if (havoc_info == newState->havocs.end() &&
+        !restartState->condoneUndeclaredHavocs) {
       printf("Unexpected memory location being havoced.\n");
       assert(0 && "Possible havoc location must have been predelcared");
     }
 
-    // Remember the generated value for later reporting in the ktest file.
-    havoc_info->second.value = array;
-    havoc_info->second.havoced = true;
-    havoc_info->second.mask = BitArray(*bytes, bytes->size());
-    LOG_LA("Adding havoc here: " << havoc_info->second.name << " in: " << (void*)newState);
-    // printf("mask for %s: ", havoc_info->second.name.c_str());
-    // for (unsigned i = 0; i < bytes->size(); ++i) {
-    //   printf("%s", bytes->get(i) ? "1" : "0");
-    // }
-    // printf("\n");
-    // fflush(stdout);
+    if (havoc_info != newState->havocs.end()) {
+      // Remember the generated value for later reporting in the ktest file.
+      havoc_info->second.value = array;
+      havoc_info->second.havoced = true;
+      havoc_info->second.mask = BitArray(*bytes, bytes->size());
+      LOG_LA("Adding havoc here: " << havoc_info->second.name << " in: " << (void*)newState);
+    }
 
     // Do not record this symbol, as it was not generated with klee_make_symbolic.
     //newState->symbolics.push_back(std::make_pair(mo, array));
@@ -1457,7 +1457,8 @@ bool klee::updateDiffMask(StateByteMask* mask,
       insRez = mask->insert
       (std::pair<const MemoryObject *, BitArray *>(obj, 0));
 
-    if (state.havocs.find(obj) == state.havocs.end()) {
+    if (state.havocs.find(obj) == state.havocs.end() &&
+        !state.condoneUndeclaredHavocs) {
       ref<Expr> firstByteRef = refOs->read8(0, true);
       ref<Expr> firstByte = os->read8(0, true);
       fprintf(stderr, "First byte before: ");
