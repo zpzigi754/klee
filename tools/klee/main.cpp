@@ -179,6 +179,12 @@ namespace {
                  cl::init(false));
 
   cl::opt<bool>
+  CondoneUndeclaredHavocs("condone-undeclared-havocs",
+                          cl::desc("Do not throw an error if a memory location changes "
+                                   "its value during loop invarint analysis"),
+                          cl::init(false));
+
+  cl::opt<bool>
   ReplayKeepSymbolic("replay-keep-symbolic",
                      cl::desc("Replay the test cases only by asserting "
                               "the bytes, not necessarily making them concrete."));
@@ -2058,6 +2064,7 @@ int main(int argc, char **argv, char **envp) {
 
   Interpreter::InterpreterOptions IOpts;
   IOpts.MakeConcreteSymbolic = MakeConcreteSymbolic;
+  IOpts.CondoneUndeclaredHavocs = CondoneUndeclaredHavocs;
   KleeHandler *handler = new KleeHandler(pArgc, pArgv);
   Interpreter *interpreter =
     theInterpreter = Interpreter::create(ctx, IOpts, handler);

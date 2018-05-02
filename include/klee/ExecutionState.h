@@ -306,6 +306,10 @@ public:
   ///  a product of some ancillary analysis, like loop-invariant search.
   bool doTrace;
 
+  /// @brief: Whether to forgive the undeclared memory location changing their
+  ///  value during loop invariant analysis.
+  bool condoneUndeclaredHavocs;
+
 
   std::string getFnAlias(std::string fn);
   void addFnAlias(std::string old_fn, std::string new_fn);
