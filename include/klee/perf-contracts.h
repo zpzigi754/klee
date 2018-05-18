@@ -94,5 +94,6 @@ std::string contract_get_subcontract_constraints(std::string function_name,
  */
 long contract_get_sub_contract_performance(
     std::string function_name, int sub_contract_idx,
+    std::string metric,
     std::map<std::string, long> variables);
 }
