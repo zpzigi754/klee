@@ -4,7 +4,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 py_scripts_dir=$SCRIPT_DIR/trace_scripts
 traces_dr=${1:-klee-last}
-output=${2:-stateless-exec-cyles.txt}
+output=${2:-stateless-perf.txt}
 
 cd $traces_dr
 python $py_scripts_dir/process_trace.py ./
