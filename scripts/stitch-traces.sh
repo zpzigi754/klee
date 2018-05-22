@@ -32,21 +32,23 @@ function stitch_traces {
                 ::: $TRACES_DIR/*.call_path > $TRACES_DIR/stateful-perf.txt
   fi
 
-  awk '
-  {
-    if ($2 < 0 || totals[$1] < 0) {
-      totals[$1] = -1;
-    } else {
-      totals[$1] += $2;
-    }
-  }
+  join -t, -j1 \
+      <(sort klee-last/stateful-perf.txt | awk -F, '{print $1 "_" $2 "," $3}') \
+      <(sort klee-last/stateless-perf.txt | awk -F, '{print $1 "_" $2 "," $3}') \
+    | sed -e 's/_/,/' \
+    | awk -F, '
+      {
+        performance = ($3 + $4);
+        if (performance > max_performance[$2]) {
+          max_performance[$2] = performance;
+        }
+      }
 
-  END {
-    for (trace in totals) {
-      print totals[trace];
-    }
-  }' $TRACES_DIR/stateful-perf.txt $TRACES_DIR/stateless-perf.txt \
-    | sort -n | tail -n 1
+      END {
+        for (metric in max_performance) {
+          print metric "," max_performance[metric];
+        }
+      }'
 }
 
 
