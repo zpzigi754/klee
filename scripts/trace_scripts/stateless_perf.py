@@ -23,9 +23,9 @@ with open (perf_out,'w') as output:
    line4 = line4.strip()
    line4 = line4.replace(".packet.stateless_mem_trace.classified","")
    perf = l1*cpi + (l2-l3)*dram_latency + l3*l1_latency
-   output.write(line4 + " " + "instruction count"+ " " +str(l1+l2)+"\n")
-   output.write(line4 + " " + "memory instructions"+ " "+ str(l2)+"\n")
-   output.write(line4 + " " + "execution cycles"+ " " +str(perf)+"\n")
+   output.write(line4 + "," + "instruction count"+ "," +str(l1+l2)+"\n")
+   output.write(line4 + "," + "memory instructions"+ ","+ str(l2)+"\n")
+   output.write(line4 + "," + "execution cycles"+ "," +str(perf)+"\n")
 	
 
 
