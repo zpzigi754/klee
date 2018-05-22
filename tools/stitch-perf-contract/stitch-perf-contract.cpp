@@ -225,8 +225,10 @@ call_path_t *load_call_path(std::string file_name,
   return call_path;
 }
 
-long process_candidate(call_path_t *call_path, void *contract,
-                       std::map<std::string, klee::ref<klee::Expr>> vars) {
+std::map<std::string, long>
+process_candidate(call_path_t *call_path, void *contract,
+                  std::map<std::string, klee::ref<klee::Expr>> vars) {
+  LOAD_SYMBOL(contract, contract_get_metrics);
   LOAD_SYMBOL(contract, contract_has_contract);
   LOAD_SYMBOL(contract, contract_num_sub_contracts);
   LOAD_SYMBOL(contract, contract_get_subcontract_constraints);
@@ -289,7 +291,7 @@ long process_candidate(call_path_t *call_path, void *contract,
         llvm::errs().flush();
         std::cerr << std::endl;
 #endif
-        return -1;
+        return {};
       }
 
       constraints.addConstraint(eq_expr);
@@ -308,7 +310,7 @@ long process_candidate(call_path_t *call_path, void *contract,
   }
 #endif
 
-  long cycles = 0;
+  std::map<std::string, long> total_performance;
   for (auto cit : call_path->calls) {
 #ifdef DEBUG
     std::cerr << "Debug: Processing call to " << cit.function_name << std::endl;
@@ -368,7 +370,7 @@ long process_candidate(call_path_t *call_path, void *contract,
 
           bool check = true;
           success = solver->mayBeFalse(expr_query.withExpr(exprBuilder->Eq(
-                                       extra_var.second.first, result)),
+                                           extra_var.second.first, result)),
                                        check);
           assert(success);
           assert((!check) && "Candidate allows multiple variable assignments.");
@@ -382,10 +384,13 @@ long process_candidate(call_path_t *call_path, void *contract,
         }
 #endif
 
-        long performance = contract_get_sub_contract_performance(
-            cit.function_name, sub_contract_idx, variables);
-        assert(performance >= 0);
-        cycles += performance;
+        std::set<std::string> metrics = contract_get_metrics();
+        for (auto metric : metrics) {
+          long performance = contract_get_sub_contract_performance(
+              cit.function_name, sub_contract_idx, metric, variables);
+          assert(performance >= 0);
+          total_performance[metric] += performance;
+        }
       }
     }
     if (!found_subcontract) {
@@ -393,14 +398,18 @@ long process_candidate(call_path_t *call_path, void *contract,
       std::cerr << "Debug: No subcontract for " << cit.function_name
                 << " is SAT." << std::endl;
 #endif
-      return -1;
+      return {};
     }
   }
 
 #ifdef DEBUG
-  std::cerr << "Debug: Candidate cycles: " << cycles << std::endl;
+  std::cerr << "Debug: Candidate performance:" << std::endl;
+  for (auto metric : total_performance) {
+    std::cerr << "Debug:   " << metric.first << ": " << metric.second
+              << std::endl;
+  }
 #endif
-  return cycles;
+  return total_performance;
 }
 
 int main(int argc, char **argv, char **envp) {
@@ -532,7 +541,7 @@ int main(int argc, char **argv, char **envp) {
   }
 #endif
 
-  long max_cycles = -1;
+  std::map<std::string, long> max_performance;
   std::map<std::string, std::set<klee::ref<klee::Expr>>::iterator>::iterator
       pos;
   do {
@@ -542,9 +551,13 @@ int main(int argc, char **argv, char **envp) {
       vars[it.first] = *it.second;
     }
 
-    long cycles = process_candidate(call_path, contract, vars);
-    if (cycles >= 0 && cycles > max_cycles) {
-      max_cycles = cycles;
+    std::map<std::string, long> performance =
+        process_candidate(call_path, contract, vars);
+    for (auto metric : performance) {
+      assert(metric.second >= 0);
+      if (metric.second > max_performance[metric.first]) {
+        max_performance[metric.first] = metric.second;
+      }
     }
 
     pos = candidate_iterators.begin();
@@ -560,10 +573,12 @@ int main(int argc, char **argv, char **envp) {
     }
   } while (pos != candidate_iterators.end());
 
-  if (max_cycles < 0) {
+  if (max_performance.empty()) {
     std::cerr << "Warning: No candidate was SAT." << std::endl;
   }
 
-  std::cout << max_cycles << std::endl;
+  for (auto metric : max_performance) {
+    std::cout << metric.first << "," << metric.second << std::endl;
+  }
   return 0;
 }
