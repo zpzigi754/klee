@@ -5,8 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 py_scripts_dir=$SCRIPT_DIR/trace_scripts
 traces_dr=${1:-klee-last}
 insns_output=${2:-stateless-insn-count.txt}
-mem_output=${2:-stateless-mem-insns.txt}
-cycles_output=${2:-stateless-exec-cyles.txt}
+mem_output=${3:-stateless-mem-insns.txt}
+cycles_output=${4:-stateless-exec-cyles.txt}
 
 cd $traces_dr
 python $py_scripts_dir/process_trace.py ./
