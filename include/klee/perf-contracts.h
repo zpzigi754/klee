@@ -52,8 +52,7 @@ contract_get_optimization_variables();
  *
  * @returns A set of symbol declarations used.
  */
-std::set<std::string>
-contract_get_symbols();
+std::set<std::string> contract_get_symbols();
 
 /**
  * Gets a set of functions with contracts.
@@ -100,7 +99,6 @@ std::string contract_get_subcontract_constraints(std::string function_name,
  * @returns The computed CPU cycle bound.
  */
 long contract_get_sub_contract_performance(
-    std::string function_name, int sub_contract_idx,
-    std::string metric,
+    std::string function_name, int sub_contract_idx, std::string metric,
     std::map<std::string, long> variables);
 }
