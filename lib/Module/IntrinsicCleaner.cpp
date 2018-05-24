@@ -304,7 +304,7 @@ bool IntrinsicCleanerPass::runOnBasicBlock(BasicBlock &b, Module &M) {
         break;
       }
       case Intrinsic::x86_sse41_phminposuw: {
-        assert(ii->getNumArgOperands() == 2 && "wrong number of arguments");
+        assert(ii->getNumArgOperands() == 1 && "wrong number of arguments");
         Value *a = ii->getArgOperand(0);
         assert(a && "Failed to get first argument");
         new UnreachableInst(ctx, ii);
