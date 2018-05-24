@@ -131,7 +131,7 @@ void klee_make_symbolic(void *array, size_t nbytes, const char *name) {
       }
       if (strcmp(name, o->name) != 0) {
         report_internal_error(
-            "object name mismatch. Requesting \"%s\" but returning \"%s\"",
+            "object name mismatch. Requesting \"%s\" but returning \"%s\"\n",
             name, o->name);
       }
       memcpy(array, o->bytes, nbytes < o->numBytes ? nbytes : o->numBytes);
@@ -281,7 +281,7 @@ int klee_range(int begin, int end, const char* name) {
 void klee_prefer_cex(void *object, uintptr_t condition) { }
 
 void klee_abort() {
-  abort();
+  exit(-1);
 }
 
 int klee_int(const char *name) {
