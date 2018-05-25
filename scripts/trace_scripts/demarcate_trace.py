@@ -13,7 +13,7 @@ stateful_fns = {}
 verif_fns = {}
 dpdk_fns = {}
 time_fns = {}
-symbol_re = re.compile('_dl*')
+symbol_re = re.compile('klee*')
 
 def main():
  with open(stateful_file,"r") as stateful:
@@ -61,7 +61,7 @@ def main():
         elif(fn_name in time_fns):
          time = 1
          break
-        elif(fn_name in verif_fns):
+        elif(fn_name in verif_fns or symbol_re.match(fn_name)):
          verif = 1
          break
        if(stateful):
