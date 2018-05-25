@@ -6,17 +6,13 @@ import subprocess
 import string
 import os
 
-trace_path = sys.argv[1]
+trace_file = sys.argv[1]
 
 def main():
- i=1
- for root, dirs, files in os.walk(trace_path):
-  for file in files:
-   with open(file) as f:
-    if file.endswith(".instructions"):
+   with open(trace_file) as f:
      trace_lines = (line.rstrip() for line in f)
      trace_lines = list(line for line in trace_lines if line)
-     dump_file=file.replace('.instructions','.packet_relevant_instructions')
+     dump_file=trace_file.replace('.instructions','.packet_relevant_instructions')
      packet_code = 0
      start = 0
      end = -1
@@ -36,6 +32,10 @@ def main():
          if(fn == "rte_eth_tx_burst"):
           temp_end = 1
 	  continue
+ 
+	 if(fn == "exit@plt"):
+	  end =1
+          break
         
         if(start == 0 and temp_start == 1):
 	 start = 1
