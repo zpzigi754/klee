@@ -1,2 +1,13 @@
-klee_make_symbolic
-klee_int
+loop_iteration_assumptions
+loop_iteration_assertions
+loop_invariant_consume
+loop_invariant_produce
+loop_iteration_begin
+loop_iteration_end
+loop_enumeration_begin
+loop_enumeration_end
+allocate_unique_name
+count_reuse
+init_test_data
+report_internal_error
+rand_byte
