@@ -287,7 +287,7 @@ private:
     print(ee->expr, PC);
   }
 
-  void printExpr(const Expr *ep, PrintContext &PC, unsigned indent, bool printConstWidth=false) {
+  void printExpr(const Expr *ep, PrintContext &PC, unsigned indent, bool printConstWidth=true) {
     bool simple = hasSimpleKids(ep);
     
     print(ep->getKid(0), PC);
@@ -358,7 +358,7 @@ public:
     }    
   }
 
-  void print(const ref<Expr> &e, PrintContext &PC, bool printConstWidth=false) {
+  void print(const ref<Expr> &e, PrintContext &PC, bool printConstWidth=true) {
     if (ConstantExpr *CE = dyn_cast<ConstantExpr>(e))
       printConst(CE, PC, printConstWidth);
     else {
