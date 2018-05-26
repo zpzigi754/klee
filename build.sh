@@ -24,6 +24,7 @@ cd "$KLEE_DIR/build"
                          -DENABLE_POSIX_RUNTIME=ON \
                          -DCMAKE_BUILD_TYPE=Debug \
                          -DENABLE_KLEE_ASSERTS=ON \
+                         -DENABLE_DOXYGEN=ON \
                          ..
 
 
