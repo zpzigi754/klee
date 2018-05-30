@@ -11,3 +11,8 @@ count_reuse
 init_test_data
 report_internal_error
 rand_byte
+bridge_loop_invariant_consume
+bridge_loop_invariant_produce
+bridge_loop_iteration_begin
+bridge_loop_iteration_end
+bridge_loop_iteration_assumptions

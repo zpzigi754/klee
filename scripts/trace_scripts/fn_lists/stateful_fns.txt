@@ -8,6 +8,7 @@ dmap_get_b
 dmap_put
 dmap_erase
 expire_items
+expire_items_single_map
 map_impl_init
 map_impl_get
 map_impl_put
