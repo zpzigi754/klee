@@ -16,3 +16,6 @@ bridge_loop_invariant_produce
 bridge_loop_iteration_begin
 bridge_loop_iteration_end
 bridge_loop_iteration_assumptions
+nf_loop_iteration_begin
+nf_add_loop_iteration_assumptions
+nf_loop_iteration_end
