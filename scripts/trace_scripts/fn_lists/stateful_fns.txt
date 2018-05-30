@@ -30,3 +30,10 @@ dmap_set_entry_condition
 dmap_reset
 dmap_increase_occupancy
 dmap_decrease_occupancy
+vector_allocate
+vector_borrow_full
+vector_borrow_half
+vector_return_full
+vector_return_half
+vector_set_layout
+vector_reset
