@@ -665,7 +665,7 @@ void ExecutionState::traceArgPtrNestedField(ref<Expr> arg,
   assert(argInfo != 0 &&
          "Must first trace the pointer arg to trace a particular field.");
   assert(argInfo->pointee.width > 0 && "Cannot fit a field into zero bytes.");
-  assert(argInfo->pointee.doTraceValueIn && "Must trace the whole pointee to trace"
+  assert((trace_in ? argInfo->pointee.doTraceValueIn : true) && "Must trace the whole pointee to trace"
          " a single field.");
   assert(argInfo->pointee.fields.count(base_offset) != 0 &&
          "Must first trace the field itself.");
