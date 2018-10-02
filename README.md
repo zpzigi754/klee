@@ -1,4 +1,12 @@
-This repo contains features neccesary for the VNDS project.
+# KLEE fork for the Vigor project
+
+Changes:
+- Add functionality to trace specific calls and dump all call paths/prefixes
+- Add loop-havocing functionality with automatic invariant inducing
+- Add memory-access restriction methods to allow/forbid code from accessing specific objects (so that their use as opaque pointers can be enforced)
+- Add read/write intercepts (to model hardware)
+- Add regex support for function aliases (to alias static inline functions whose name is mangled)
+
 
 KLEE Symbolic Virtual Machine
 =============================
