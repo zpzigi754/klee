@@ -532,7 +532,7 @@ void KleeHandler::processTestCase(const ExecutionState &state,
         ++m_numGeneratedTests;
       }
 
-      if (DumpCallTraces) {
+      if (DumpCallTraces && !errorMessage) {
         llvm::raw_fd_ostream *trace_file =
           openOutputFile(getTestFilename("call_path", id));
         dumpCallPath(state, trace_file);
