@@ -128,6 +128,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_trace_param_u64", handleTraceParam, false),
   add("klee_trace_param_ptr", handleTraceParamPtr, false),
   add("klee_trace_param_ptr_directed", handleTraceParamPtrDirected, false),
+  add("klee_trace_param_arr_directed", handleTraceParamArrDirected, false),
   add("klee_trace_param_tagged_ptr", handleTraceParamTaggedPtr, false),
   add("klee_trace_param_just_ptr", handleTraceParamJustPtr, false),
   add("klee_trace_param_fptr", handleTraceParamFPtr, false),
@@ -145,6 +146,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_trace_param_ptr_nested_field_directed", handleTraceParamPtrNestedFieldDirected, false),
   add("klee_trace_ret_ptr_nested_field", handleTraceRetPtrNestedField, false),
   add("klee_trace_extra_ptr", handleTraceExtraPtr, false),
+  add("klee_trace_extra_ptr_arr", handleTraceExtraPtrArr, false),
   add("klee_trace_extra_ptr_field", handleTraceExtraPtrField, false),
   add("klee_trace_extra_ptr_field_just_ptr",
       handleTraceExtraPtrFieldJustPtr, false),
@@ -1045,6 +1047,35 @@ void SpecialFunctionHandler::handleTraceExtraPtr(ExecutionState &state,
   state.traceExtraPtr(ptr, width, name, type, trace_in, trace_out);
 }
 
+void SpecialFunctionHandler::handleTraceExtraPtrArr(ExecutionState &state,
+                                                    KInstruction *target,
+                                                    std::vector<ref<Expr> >
+                                                    &arguments) {
+  assert(isa<klee::ConstantExpr>(arguments[1]) && "Width must be a static constant.");
+  assert(isa<klee::ConstantExpr>(arguments[2]) && "Array length must be a static constant.");
+  Expr::Width width = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
+  width = width * 8;//Convert to bits.
+  size_t count = (cast<klee::ConstantExpr>(arguments[2]))->getZExtValue();
+  std::string name = readStringAtAddress(state, arguments[3]);
+  std::string type = readStringAtAddress(state, arguments[4]);
+
+  bool trace_in = true, trace_out = true;
+  size_t direction = (cast<klee::ConstantExpr>(arguments[5]))->getZExtValue();
+  switch(direction) {
+    case 0: trace_in = false; trace_out = false; break;
+    case 1: trace_in = true;  trace_out = false; break;
+    case 2: trace_in = false; trace_out = true; break;
+    case 3: trace_in = true;  trace_out = true; break;
+    default:
+      executor.terminateStateOnError
+        (state, "Unrecognized tracing direction",
+        Executor::User);
+      return;
+  }
+
+  size_t ptr = (cast<ConstantExpr>(arguments[0]))->getZExtValue();
+  state.traceExtraPtrArr(ptr, width, count, name, type, trace_in, trace_out);
+}
 
 void SpecialFunctionHandler::handleTraceParamPtrNestedField
 (ExecutionState &state,
@@ -1319,6 +1350,48 @@ void SpecialFunctionHandler::handleTraceParamPtrDirected(ExecutionState &state,
     return;
   }
   state.traceArgPtr(arguments[0], width, name, "", trace_in, trace_out);
+}
+
+void SpecialFunctionHandler::handleTraceParamArrDirected(ExecutionState &state,
+                                                         KInstruction *target,
+                                                         std::vector<ref<Expr> >
+                                                         &arguments) {
+  if (!isa<klee::ConstantExpr>(arguments[1])) {
+    executor.terminateStateOnError
+      (state, "Width must be a static constant.",
+       Executor::User);
+    return;
+  }
+  if (!isa<klee::ConstantExpr>(arguments[2])) {
+    executor.terminateStateOnError
+      (state, "Array length must be a static constant.",
+       Executor::User);
+    return;
+  }
+  if (!isa<klee::ConstantExpr>(arguments[4])) {
+    executor.terminateStateOnError
+      (state, "Direction must be a static constant.",
+       Executor::User);
+    return;
+  }
+  Expr::Width width = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
+  width = width * 8;//Convert to bits.
+  size_t count = (cast<klee::ConstantExpr>(arguments[2]))->getZExtValue();
+  std::string name = readStringAtAddress(state, arguments[3]);
+  size_t direction = (cast<klee::ConstantExpr>(arguments[4]))->getZExtValue();
+  bool trace_in = false, trace_out = false;
+  switch(direction) {
+  case 0: trace_in = false; trace_out = false; break;
+  case 1: trace_in = true;  trace_out = false; break;
+  case 2: trace_in = false; trace_out = true; break;
+  case 3: trace_in = true;  trace_out = true; break;
+  default:
+    executor.terminateStateOnError
+      (state, "Unrecognized tracing direction",
+       Executor::User);
+    return;
+  }
+  state.traceArgArr(arguments[0], width, count, name, "", trace_in, trace_out);
 }
 
 
