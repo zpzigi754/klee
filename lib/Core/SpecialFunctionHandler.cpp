@@ -1052,7 +1052,6 @@ void SpecialFunctionHandler::handleTraceExtraPtrArr(ExecutionState &state,
                                                     std::vector<ref<Expr> >
                                                     &arguments) {
   assert(isa<klee::ConstantExpr>(arguments[1]) && "Width must be a static constant.");
-  assert(isa<klee::ConstantExpr>(arguments[2]) && "Array length must be a static constant.");
   Expr::Width width = (cast<klee::ConstantExpr>(arguments[1]))->getZExtValue();
   width = width * 8;//Convert to bits.
   size_t count = (cast<klee::ConstantExpr>(arguments[2]))->getZExtValue();
@@ -1359,12 +1358,6 @@ void SpecialFunctionHandler::handleTraceParamArrDirected(ExecutionState &state,
   if (!isa<klee::ConstantExpr>(arguments[1])) {
     executor.terminateStateOnError
       (state, "Width must be a static constant.",
-       Executor::User);
-    return;
-  }
-  if (!isa<klee::ConstantExpr>(arguments[2])) {
-    executor.terminateStateOnError
-      (state, "Array length must be a static constant.",
        Executor::User);
     return;
   }
