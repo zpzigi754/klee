@@ -639,6 +639,35 @@ void ExecutionState::traceArgPtr(ref<Expr> arg, Expr::Width width,
                                      constrs.begin(), constrs.end());
 }
 
+void ExecutionState::traceArgArr(ref<Expr> arg, Expr::Width width, size_t count,
+                                 std::string name,
+                                 std::string type,
+                                 bool tracePointeeIn,
+                                 bool tracePointeeOut) {
+  traceArgValue(arg, name);
+  CallArg *argInfo = &callPath.back().args.back();
+  argInfo->isPtr = true;
+  argInfo->pointee.width = width*count;
+  argInfo->pointee.type = type;
+  argInfo->funPtr = NULL;
+  argInfo->pointee.doTraceValueIn = tracePointeeIn;
+  argInfo->pointee.doTraceValueOut = tracePointeeOut;
+  SymbolSet symbols = GetExprSymbols::visit(arg);
+  if (tracePointeeIn) {
+    argInfo->pointee.inVal = readMemoryChunk(arg, width*count, true);
+    SymbolSet indirectSymbols =
+      GetExprSymbols::visit(argInfo->pointee.inVal);
+    symbols.insert(indirectSymbols.begin(), indirectSymbols.end());
+  }
+  std::vector<ref<Expr> > constrs = relevantConstraints(symbols);
+  callPath.back().callContext.insert(callPath.back().callContext.end(),
+                                     constrs.begin(), constrs.end());
+  for (size_t i = 0; i < count; ++i) {
+    //width is given in bits, we need bytes for the offset
+    traceArgPtrField(arg, i*width/8, width, std::to_string(i), tracePointeeIn, tracePointeeOut);
+  }
+}
+
 void ExecutionState::traceArgFunPtr(ref<Expr> arg,
                                     std::string name) {
   traceArgValue(arg, name);
@@ -830,6 +859,40 @@ void ExecutionState::traceExtraPtr(size_t ptr, Expr::Width width,
   std::vector<ref<Expr> > constrs = relevantConstraints(indirectSymbols);
   callPath.back().callContext.insert(callPath.back().callContext.end(),
                                      constrs.begin(), constrs.end());
+}
+
+void ExecutionState::traceExtraPtrArr(size_t ptr, Expr::Width width, size_t count,
+                                      std::string name,
+                                      std::string type,
+                                      bool trace_in, bool trace_out) {
+  traceRet();
+  callPath.back().extraPtrs.
+    insert(std::pair<const size_t, CallExtraPtr>(ptr, CallExtraPtr()));
+  CallExtraPtr *extraPtr = &callPath.back().extraPtrs[ptr];
+  extraPtr->ptr = ptr;
+  extraPtr->name = name;
+  extraPtr->pointee.width = width*count;
+  extraPtr->pointee.type = type;
+  extraPtr->pointee.doTraceValueIn = trace_in;
+  extraPtr->pointee.doTraceValueOut = trace_out;
+  extraPtr->accessibleIn = trace_in &&
+    isAccessibleAddr(ConstantExpr::alloc(ptr, 8*sizeof(size_t)));
+  extraPtr->accessibleOut = trace_out;
+
+  SymbolSet indirectSymbols;
+  if (trace_in) {
+    extraPtr->pointee.inVal =
+      constraints.simplifyExpr
+      (readMemoryChunk(ConstantExpr::alloc(ptr, sizeof(size_t)*8), width*count, true));
+    indirectSymbols = GetExprSymbols::visit(extraPtr->pointee.inVal);
+  }
+  std::vector<ref<Expr> > constrs = relevantConstraints(indirectSymbols);
+  callPath.back().callContext.insert(callPath.back().callContext.end(),
+                                     constrs.begin(), constrs.end());
+  for (size_t i = 0; i < count; ++i) {
+    //width is given in bits, we need bytes for the offset
+    traceExtraPtrField(ptr, i*width/8, width, std::to_string(i), trace_in, trace_out);
+  }
 }
 
 void ExecutionState::traceExtraPtrField(size_t ptr,

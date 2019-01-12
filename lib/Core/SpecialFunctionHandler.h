@@ -146,6 +146,7 @@ namespace klee {
     HANDLER(handleTraceParam);
     HANDLER(handleTraceParamPtr);
     HANDLER(handleTraceParamPtrDirected);
+    HANDLER(handleTraceParamArrDirected);
     HANDLER(handleTraceParamTaggedPtr);
     HANDLER(handleTraceParamJustPtr);
     HANDLER(handleTraceParamFPtr);
@@ -161,6 +162,7 @@ namespace klee {
     HANDLER(handleTraceParamPtrNestedFieldDirected);
     HANDLER(handleTraceRetPtrNestedField);
     HANDLER(handleTraceExtraPtr);
+    HANDLER(handleTraceExtraPtrArr);
     HANDLER(handleTraceExtraPtrField);
     HANDLER(handleTraceExtraPtrFieldJustPtr);
     HANDLER(handleTraceExtraPtrNestedField);
