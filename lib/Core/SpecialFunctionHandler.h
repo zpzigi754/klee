@@ -159,13 +159,15 @@ namespace klee {
     HANDLER(handleTraceRetPtrField);
     HANDLER(handleTraceRetPtrFieldJustPtr);
     HANDLER(handleTraceParamPtrNestedField);
+    HANDLER(handleTraceParamPtrNestedFieldArrDirected);
     HANDLER(handleTraceParamPtrNestedFieldDirected);
     HANDLER(handleTraceRetPtrNestedField);
     HANDLER(handleTraceExtraPtr);
-    HANDLER(handleTraceExtraPtrArr);
+    HANDLER(handleTraceExtraPtrArray);
     HANDLER(handleTraceExtraPtrField);
     HANDLER(handleTraceExtraPtrFieldJustPtr);
     HANDLER(handleTraceExtraPtrNestedField);
+    HANDLER(handleTraceExtraPtrNestedFieldArray);
     HANDLER(handleTraceExtraPtrNestedNestedField);
     HANDLER(handleForgetAll);
     HANDLER(handleInduceInvariants);
