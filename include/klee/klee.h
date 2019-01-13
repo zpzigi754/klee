@@ -245,6 +245,10 @@ extern "C" {
   void klee_trace_param_ptr_nested_field_directed(void* ptr, int base_offset,
                                                   int offset, int width, const char* name,
                                                   TracingDirection td);
+  void klee_trace_param_ptr_nested_field_arr_directed(void* ptr, int base_offset,
+                                                      int offset, int el_width,
+                                                      int count, char* name,
+                                                      TracingDirection td);
   void klee_trace_ret_ptr_nested_field(int base_offset,
                                        int offset, int width, const char* name);
   void klee_trace_extra_ptr(void* ptr, int width, const char* name, const char* type, TracingDirection td);
@@ -254,6 +258,9 @@ extern "C" {
                                            int width, const char* name);
   void klee_trace_extra_ptr_nested_field(void* ptr, int base_offset,
                                          int offset, int width, const char* name, TracingDirection td);
+  void klee_trace_extra_ptr_nested_field_arr(void* ptr, int base_offset,
+                                             int offset, int el_width, int count,
+                                             const char* name, TracingDirection td);
   void klee_trace_extra_ptr_nested_nested_field(void* ptr, int base_base_offset,
                                                 int base_offset, int offset,
                                                 int width, const char* name, TracingDirection td);
