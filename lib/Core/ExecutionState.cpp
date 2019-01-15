@@ -644,6 +644,9 @@ void ExecutionState::traceArgArr(ref<Expr> arg, Expr::Width width, size_t count,
                                  std::string type,
                                  bool tracePointeeIn,
                                  bool tracePointeeOut) {
+  if (count == 0) {
+    return traceArgPtr(arg, width, name, type, tracePointeeIn, tracePointeeOut);
+  }
   traceArgValue(arg, name);
   CallArg *argInfo = &callPath.back().args.back();
   argInfo->isPtr = true;
@@ -710,6 +713,52 @@ void ExecutionState::traceArgPtrField(ref<Expr> arg,
   descr.doTraceValueIn = doTraceValueIn;
   descr.doTraceValueOut = doTraceValueOut;
   argInfo->pointee.fields[offset] = descr;
+}
+
+void ExecutionState::traceArgPtrFieldArr(ref<Expr> arg,
+                                         int offset,
+                                         Expr::Width el_width,
+                                         int count,
+                                         std::string name,
+                                         bool doTraceValueIn,
+                                         bool doTraceValueOut) {
+  if (count == 0) {
+    return traceArgPtrField(arg, offset, el_width, name, doTraceValueIn, doTraceValueOut);
+  }
+  assert(!callPath.empty() &&
+         callPath.back().f == stack.back().kf->function &&
+         "Must trace the function first to trace a particular field.");
+  CallArg *argInfo = callPath.back().getCallArgPtrp(arg);
+  assert(argInfo != 0 &&
+         "Must first trace the pointer arg to trace a particular field.");
+  assert(argInfo->pointee.width > 0 && "Cannot fit a field into zero bytes.");
+  assert((argInfo->pointee.doTraceValueIn ||
+          !doTraceValueIn) &&
+         "Must trace the whole pointee to trace a single field.");
+  assert((argInfo->pointee.doTraceValueOut ||
+          !doTraceValueOut) &&
+         "Must trace the whole pointee to trace a single field.");
+  assert(argInfo->pointee.fields.count(offset) == 0 && "Conflicting field.");
+  FieldDescr descr;
+  descr.width = el_width*count;
+  descr.name = name;
+  size_t base = (cast<ConstantExpr>(arg))->getZExtValue();
+  if (doTraceValueIn) {
+    ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + offset,
+                                                     sizeof(size_t)*8);
+    descr.inVal = readMemoryChunk(addrExpr, el_width*count, true);
+  }
+  descr.addr = base + offset;
+  descr.doTraceValueIn = doTraceValueIn;
+  descr.doTraceValueOut = doTraceValueOut;
+  argInfo->pointee.fields[offset] = descr;
+  for (int i = 0; i < count; ++i) {
+    //width is given in bits, we need bytes for the offset
+    traceArgPtrNestedField(arg, offset, i*el_width/8,
+                           el_width, std::to_string(i),
+                           doTraceValueIn,
+                           doTraceValueOut);
+  }
 }
 
 void ExecutionState::traceArgPtrNestedNestedField(ref<Expr> arg,
@@ -810,6 +859,9 @@ void ExecutionState::traceArgPtrNestedFieldArr(ref<Expr> arg,
                                                int count,
                                                std::string name,
                                                bool trace_in, bool trace_out) {
+  if (count == 0) {
+    return traceArgPtrNestedField(arg, base_offset, offset, width, name, trace_in, trace_out);
+  }
   assert(!callPath.empty() &&
          callPath.back().f == stack.back().kf->function &&
          "Must trace the function first to trace a particular field.");
@@ -889,6 +941,9 @@ void ExecutionState::traceExtraPtrNestedFieldArr(size_t ptr,
                                                  int count,
                                                  std::string name,
                                                  bool trace_in, bool trace_out) {
+  if (count == 0) {
+    return traceExtraPtrNestedField(ptr, base_offset, offset, width, name, trace_in, trace_out);
+  }
   assert(!callPath.empty() &&
          callPath.back().f == stack.back().kf->function &&
          "Must trace the function first to trace a particular field.");
@@ -1002,6 +1057,9 @@ void ExecutionState::traceExtraPtrArr(size_t ptr, Expr::Width width, size_t coun
                                       std::string name,
                                       std::string type,
                                       bool trace_in, bool trace_out) {
+  if (count == 0) {
+    return traceExtraPtr(ptr, width, name, type, trace_in, trace_out);
+  }
   traceRet();
   callPath.back().extraPtrs.
     insert(std::pair<const size_t, CallExtraPtr>(ptr, CallExtraPtr()));
@@ -1056,6 +1114,42 @@ void ExecutionState::traceExtraPtrField(size_t ptr,
   descr.doTraceValueIn = trace_in;
   descr.doTraceValueOut = trace_out;
   extraPtr->pointee.fields[offset] = descr;
+}
+
+void ExecutionState::traceExtraPtrFieldArray(size_t ptr,
+                                             int offset,
+                                             Expr::Width el_width,
+                                             int count,
+                                             std::string name,
+                                             bool trace_in, bool trace_out) {
+  if (count == 0) {
+    return traceExtraPtrField(ptr, offset, el_width, name, trace_in, trace_out);
+  }
+  assert(!callPath.empty() &&
+         callPath.back().f == stack.back().kf->function &&
+         "Must trace the function first to trace a particular field.");
+  CallExtraPtr *extraPtr = &callPath.back().extraPtrs[ptr];
+  assert(extraPtr->pointee.width > 0 && "Cannot fit a field into zero bytes.");
+  assert(extraPtr->pointee.fields.count(offset) == 0 && "Conflicting field.");
+  FieldDescr descr;
+  descr.width = el_width*count;
+  descr.name = name;
+  size_t base = ptr;
+  if (trace_in) {
+    ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + offset,
+                                                     sizeof(size_t)*8);
+    descr.inVal = readMemoryChunk(addrExpr, el_width*count, true);
+  }
+  descr.addr = base + offset;
+  descr.doTraceValueIn = trace_in;
+  descr.doTraceValueOut = trace_out;
+  extraPtr->pointee.fields[offset] = descr;
+  for (int i = 0; i < count; ++i) {
+    //width is given in bits, we need bytes for the offset
+    traceExtraPtrNestedField(ptr, offset,
+                             i*el_width/8, el_width, std::to_string(i),
+                             trace_in, trace_out);
+  }
 }
 
 
