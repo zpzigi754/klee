@@ -386,6 +386,10 @@ public:
                         Expr::Width width, std::string name,
                         bool doTraceValueIn,
                         bool doTraceValueOut);
+  void traceArgPtrFieldArr(ref<Expr> arg, int offset,
+                           Expr::Width el_width, int count, std::string name,
+                           bool doTraceValueIn,
+                           bool doTraceValueOut);
   void traceArgPtrNestedField(ref<Expr> arg, int base_offset, int offset,
                               Expr::Width width, std::string name,
                               bool trace_in, bool trace_out);
@@ -410,6 +414,9 @@ public:
   void traceExtraPtrField(size_t ptr, int offset,
                           Expr::Width width, std::string name,
                           bool trace_in, bool trace_out);
+  void traceExtraPtrFieldArray(size_t ptr, int offset,
+                               Expr::Width el_width, int count, std::string name,
+                               bool trace_in, bool trace_out);
   void traceExtraPtrNestedField(size_t ptr,
                                 int base_offset,
                                 int offset,
