@@ -1755,48 +1755,6 @@ bool klee::updateDiffMask(StateByteMask* mask,
       insRez = mask->insert
       (std::pair<const MemoryObject *, BitArray *>(obj, 0));
 
-    if (state.havocs.find(obj) == state.havocs.end() &&
-        !state.condoneUndeclaredHavocs) {
-      ref<Expr> firstByteRef = refOs->read8(0, true);
-      ref<Expr> firstByte = os->read8(0, true);
-      fprintf(stderr, "First byte before: ");
-      fflush(stderr);
-      firstByteRef->dump();
-      fprintf(stderr, "First byte after: ");
-      fflush(stderr);
-      firstByte->dump();
-      fprintf(stderr, "Type: ");
-      fflush(stderr);
-      obj->allocSite->getType()->dump();
-      fprintf(stderr, "\n");
-      std::string metadata;
-      if (isa<llvm::Instruction>(obj->allocSite)) {
-        const llvm::Instruction *inst = dyn_cast<llvm::Instruction>(obj->allocSite);
-        if (llvm::MDNode *node = inst->getMetadata("dbg")) {
-          llvm::DILocation loc(node);
-          metadata = loc.getDirectory().str() + "/" +
-            loc.getFilename().str() + ":" +
-            numToStr(loc.getLineNumber());
-        } else {
-          metadata = "(unknown)";
-        }
-      } else {
-        metadata = "(not an instruciton)";
-      }
-      klee_error("Unexpected memory location changed its value during invariant analysis:\n"
-                 "  name: %s\n  location: %s\n"
-                 "  local: %s\n  global: %s\n"
-                 "  fixed: %s\n  size: %u\n"
-                 "  address: 0x%lx\n  metadata: %s",
-                 obj->name.c_str(),
-                 obj->allocSite->getName().str().c_str(),
-                 obj->isLocal ? "true" : "false",
-                 obj->isGlobal ? "true" : "false",
-                 obj->isFixed ? "true" : "false",
-                 obj->size,
-                 obj->address,
-                 metadata.c_str());
-    }
 
     if (insRez.second) insRez.first->second =
                          new BitArray(obj->size);
@@ -1822,6 +1780,53 @@ bool klee::updateDiffMask(StateByteMask* mask,
         if (solverRes && mayDiffer) {
           bytes->set(j);
           updated = true;
+
+          if (state.havocs.find(obj) == state.havocs.end() &&
+              !state.condoneUndeclaredHavocs) {
+            //ref<Expr> firstByteRef = refOs->read8(0, true);
+            //ref<Expr> firstByte = os->read8(0, true);
+            fprintf(stderr, "Obj size: %d vs. %d\n", refOs->size, os->size);
+            fflush(stderr);
+            fprintf(stderr, "%d byte before: ", j);
+            fflush(stderr);
+            //firstByteRef->dump();
+            refVal->dump();
+            fprintf(stderr, "%d byte after: ", j);
+            fflush(stderr);
+            //firstByte->dump();
+            val->dump();
+            fprintf(stderr, "Type: ");
+            fflush(stderr);
+            obj->allocSite->getType()->dump();
+            fprintf(stderr, "\n");
+            std::string metadata;
+            if (isa<llvm::Instruction>(obj->allocSite)) {
+              const llvm::Instruction *inst = dyn_cast<llvm::Instruction>(obj->allocSite);
+              if (llvm::MDNode *node = inst->getMetadata("dbg")) {
+                llvm::DILocation loc(node);
+                metadata = loc.getDirectory().str() + "/" +
+                  loc.getFilename().str() + ":" +
+                  numToStr(loc.getLineNumber());
+              } else {
+                metadata = "(unknown)";
+              }
+            } else {
+              metadata = "(not an instruciton)";
+            }
+            klee_error("Unexpected memory location changed its value during invariant analysis:\n"
+                       "  name: %s\n  location: %s\n"
+                       "  local: %s\n  global: %s\n"
+                       "  fixed: %s\n  size: %u\n"
+                       "  address: 0x%lx\n  metadata: %s",
+                       obj->name.c_str(),
+                       obj->allocSite->getName().str().c_str(),
+                       obj->isLocal ? "true" : "false",
+                       obj->isGlobal ? "true" : "false",
+                       obj->isFixed ? "true" : "false",
+                       obj->size,
+                       obj->address,
+                       metadata.c_str());
+          }
         }
       }
     }
