@@ -1204,6 +1204,26 @@ void Executor::executeCall(ExecutionState &state,
                            Function *f,
                            std::vector< ref<Expr> > &arguments) {
   Instruction *i = ki->inst;
+#if 0
+  static StringRef last_called;
+  bool dump = true;
+  if (f->getName().startswith("mem") ||
+      f->getName().startswith("klee_") ||
+      f->getName().startswith("strcmp")) { // dump mem* functions only once per batch
+    if (last_called.equals(f->getName())) {
+        dump = false;
+    }
+  }
+  last_called = f->getName();
+  if (StringRef(ki->info->file).startswith("/home/necto/codegen/klee-uclibc/libc")) dump = false;
+  if (dump) {
+    if (ki->info) {
+        fprintf(stderr, "%s:%d (%d) ", ki->info->file.c_str(), ki->info->line, ki->info->assemblyLine);
+    }
+    fprintf(stderr, "calling function %s\n", f->getName().data());
+    fflush(stderr);
+  }
+#endif//0
   if (f && f->isDeclaration()) {
     switch(f->getIntrinsicID()) {
     case Intrinsic::not_intrinsic:
@@ -3604,6 +3624,11 @@ void Executor::executeMemoryOperation(ExecutionState &state,
       return;
     }
 
+    //if (isWrite && isa<ConstantExpr>(address)) {
+    //    fprintf(stderr, "writing to %p (%p)[%d] <- ", address, mo->address, bytes);
+    //    value->dump();
+    //}
+
     // check if the operation is intercepted
     if (isWrite) {
       std::string interceptWriter = state.getInterceptWriter(mo->address);
@@ -3830,6 +3855,25 @@ void Executor::executePossiblyHavoc(ExecutionState &state,
   }
 
   state.addHavocInfo(mo, uniqueName);
+}
+
+void Executor::executeNeverHavoc(ExecutionState &state,
+                                 const MemoryObject *mo,
+                                 const std::string &name) {
+  if (replayKTest) {
+    terminateStateOnError(state,
+                          "klee_never_havoc does not support replayKTest.",
+                          Unhandled);
+    return;
+  }
+
+  unsigned id = 0;
+  std::string uniqueName = name;
+  while (!state.noHavocNames.insert(uniqueName).second) {
+    uniqueName = name + "_" + llvm::utostr(++id);
+  }
+
+  state.addNoHavocInfo(mo, uniqueName);
 }
 
 

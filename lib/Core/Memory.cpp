@@ -312,9 +312,11 @@ const Array *ObjectState::forgetThese(const BitArray *bytesToForget) {
   static unsigned id = 0;
   //assert(size != 0); //TODO: why size can ever be 0?
   if (size == 0) return NULL;
+
+  std::string name = "reset_" + object->name + "_" + llvm::utostr(++id);
+
   const Array *array =
-    getArrayCache()->CreateArray("reset_" + object->name + "_" + llvm::utostr(++id),
-                                 size);
+    getArrayCache()->CreateArray(name, size);
   UpdateList ul(array, 0);
   for (unsigned i=0; i<size; i++) {
     if (bytesToForget->get(i)) {
@@ -324,6 +326,8 @@ const Array *ObjectState::forgetThese(const BitArray *bytesToForget) {
       markByteUnflushed(i);
     }
   }
+  //fprintf(stderr, "generated symbol %s\n", name.c_str());
+  //fflush(stderr);
   // llvm::errs() << "\n";
   return array;
 }
@@ -512,6 +516,11 @@ void ObjectState::write8(unsigned offset, uint8_t value) {
 }
 
 void ObjectState::write8(unsigned offset, ref<Expr> value) {
+    if (offset == 222240) {
+        printf("writing at offset %u :\n", offset);
+        value->dump();
+        fflush(stderr);
+    }
   // can happen when ExtractExpr special cases
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(value)) {
     write8(offset, (uint8_t) CE->getZExtValue(8));
