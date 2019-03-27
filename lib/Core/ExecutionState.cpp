@@ -1788,7 +1788,7 @@ bool klee::updateDiffMask(StateByteMask* mask,
     assert(bytes != 0);
     unsigned size = obj->size;
     for (unsigned j = 0; j < size; ++j) {
-      //if (bytes->get(j)) continue;
+      if (bytes->get(j)) continue;
       ref<Expr> refVal = refOs->read8(j, true);
       ref<Expr> val = os->read8(j, true);
       if (0 != refVal->compare(*val)) {
