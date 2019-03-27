@@ -120,6 +120,13 @@ ExecutionState::~ExecutionState() {
     if (mo->refCount == 0)
       delete mo;
   }
+  for(auto it = noHavocs.begin(); it != noHavocs.end(); ++it) {
+    const MemoryObject *mo = it->first;
+    assert(mo->refCount > 0);
+    mo->refCount--;
+    if (mo->refCount == 0)
+      delete mo;
+  }
   delete executionStateForLoopInProcess;
 
   for (auto cur_mergehandler: openMergeStack){
@@ -160,7 +167,9 @@ ExecutionState::ExecutionState(const ExecutionState& state):
     ptreeNode(state.ptreeNode),
     symbolics(state.symbolics),
     havocs(state.havocs),
+    noHavocs(state.noHavocs),
     havocNames(state.havocNames),
+    noHavocNames(state.noHavocNames),
     arrayNames(state.arrayNames),
     openMergeStack(state.openMergeStack),
     steppedInstructions(state.steppedInstructions),
@@ -177,14 +186,27 @@ ExecutionState::ExecutionState(const ExecutionState& state):
   for(auto it = havocs.begin(); it != havocs.end(); ++it) {
     it->first->refCount++;
   }
+  for(auto it = noHavocs.begin(); it != noHavocs.end(); ++it) {
+    it->first->refCount++;
+  }
   LOG_LA("Cloning ES " << (void*)this << " from " << (void*)&state);
 }
 
 void ExecutionState::addHavocInfo(const MemoryObject *mo,
                                   const std::string &name) {
+  if (!loopInProcess.isNull()) {
+    klee_error("You must call klee_possibly_havoc(%s) outside of a "
+               "loop subject to invariant analysis.", name.c_str());
+  }
   havocs[mo].name = name;
   havocs[mo].havoced = false;
   havocs[mo].mask = BitArray();
+  mo->refCount++;
+}
+
+void ExecutionState::addNoHavocInfo(const MemoryObject *mo,
+                                    const std::string &name) {
+  noHavocs[mo] = name;
   mo->refCount++;
 }
 
@@ -1677,11 +1699,14 @@ ExecutionState *LoopInProcess::makeRestartState() {
     } else {
       wos = newState->addressSpace.getWriteable(mo, os);
     }
+    //fprintf(stderr, "for obj: %p  ", mo);
+    //fflush(stderr);
     const Array *array = wos->forgetThese(bytes);
     if (wasInaccessible) {
       wos->forbidAccessWithLastMessage();
     }
 
+    //printf("looking for %p\n", mo);
     auto havoc_info = newState->havocs.find(mo);
     if (havoc_info == newState->havocs.end() &&
         !restartState->condoneUndeclaredHavocs) {
@@ -1751,6 +1776,7 @@ bool klee::updateDiffMask(StateByteMask* mask,
     assert(refOs->isAccessible() == os->isAccessible() &&
            "No support for accessibility alteration "
            "between loop iterations.");
+    //printf("inserting %p\n", obj);
     std::pair<std::map<const MemoryObject *, BitArray *>::iterator, bool>
       insRez = mask->insert
       (std::pair<const MemoryObject *, BitArray *>(obj, 0));
@@ -1762,7 +1788,7 @@ bool klee::updateDiffMask(StateByteMask* mask,
     assert(bytes != 0);
     unsigned size = obj->size;
     for (unsigned j = 0; j < size; ++j) {
-      if (bytes->get(j)) continue;
+      //if (bytes->get(j)) continue;
       ref<Expr> refVal = refOs->read8(j, true);
       ref<Expr> val = os->read8(j, true);
       if (0 != refVal->compare(*val)) {
@@ -1781,19 +1807,80 @@ bool klee::updateDiffMask(StateByteMask* mask,
           bytes->set(j);
           updated = true;
 
+#if 0
+        fprintf(stderr, "%p Obj size: %d vs. %d\n", obj, refOs->size, os->size);
+        fflush(stderr);
+        fprintf(stderr, "%d byte before: ", j);
+        fflush(stderr);
+        refVal->dump();
+        fprintf(stderr, "%d byte after: ", j);
+        fflush(stderr);
+        val->dump();
+#endif//0
+
           if (state.havocs.find(obj) == state.havocs.end() &&
               !state.condoneUndeclaredHavocs) {
-            //ref<Expr> firstByteRef = refOs->read8(0, true);
-            //ref<Expr> firstByte = os->read8(0, true);
             fprintf(stderr, "Obj size: %d vs. %d\n", refOs->size, os->size);
             fflush(stderr);
             fprintf(stderr, "%d byte before: ", j);
             fflush(stderr);
-            //firstByteRef->dump();
             refVal->dump();
             fprintf(stderr, "%d byte after: ", j);
             fflush(stderr);
-            //firstByte->dump();
+            val->dump();
+            fprintf(stderr, "full value before: ");
+            if (refOs->size < 100) {
+              refOs->read(0, refOs->size*8, true)->dump();
+            } else {
+              fprintf(stderr, "too long\n");
+            }
+            fprintf(stderr, "full value after: ");
+            if (os->size < 100 ) {
+              os->read(0, os->size*8, true)->dump();
+            } else {
+              fprintf(stderr, "too long\n");
+            }
+            fprintf(stderr, "Type: ");
+            fflush(stderr);
+            obj->allocSite->getType()->dump();
+            fprintf(stderr, "\n");
+            std::string metadata;
+            if (isa<llvm::Instruction>(obj->allocSite)) {
+              const llvm::Instruction *inst = dyn_cast<llvm::Instruction>(obj->allocSite);
+              if (llvm::MDNode *node = inst->getMetadata("dbg")) {
+                llvm::DILocation loc(node);
+                metadata = loc.getDirectory().str() + "/" +
+                  loc.getFilename().str() + ":" +
+                  numToStr(loc.getLineNumber());
+              } else {
+                const llvm::Function* fun = inst->getParent()->getParent();
+                metadata = "in function: " + fun->getName().str();
+              }
+            } else {
+              metadata = "(not an instruciton)";
+            }
+            klee_error("Unexpected memory location changed its value during invariant analysis:\n"
+                       "  name: %s\n  location: %s\n"
+                       "  local: %s\n  global: %s\n"
+                       "  fixed: %s\n  size: %u\n"
+                       "  address: 0x%lx\n  metadata: %s",
+                       obj->name.c_str(),
+                       obj->allocSite->getName().str().c_str(),
+                       obj->isLocal ? "true" : "false",
+                       obj->isGlobal ? "true" : "false",
+                       obj->isFixed ? "true" : "false",
+                       obj->size,
+                       obj->address,
+                       metadata.c_str());
+          }
+          if (state.noHavocs.find(obj) != state.noHavocs.end()) {
+            fprintf(stderr, "Obj size: %d vs. %d\n", refOs->size, os->size);
+            fflush(stderr);
+            fprintf(stderr, "%d byte before: ", j);
+            fflush(stderr);
+            refVal->dump();
+            fprintf(stderr, "%d byte after: ", j);
+            fflush(stderr);
             val->dump();
             fprintf(stderr, "Type: ");
             fflush(stderr);
@@ -1813,11 +1900,12 @@ bool klee::updateDiffMask(StateByteMask* mask,
             } else {
               metadata = "(not an instruciton)";
             }
-            klee_error("Unexpected memory location changed its value during invariant analysis:\n"
+            klee_error("Guaranteed invariant (never-havoc %s) changed during invariant analysis:\n"
                        "  name: %s\n  location: %s\n"
                        "  local: %s\n  global: %s\n"
                        "  fixed: %s\n  size: %u\n"
                        "  address: 0x%lx\n  metadata: %s",
+                       (*state.noHavocs.find(obj)).second.c_str(),
                        obj->name.c_str(),
                        obj->allocSite->getName().str().c_str(),
                        obj->isLocal ? "true" : "false",

@@ -164,6 +164,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_allow_access", handleAllowAccess, false),
   add("klee_dump_constraints", handleDumpConstraints, false),
   add("klee_possibly_havoc", handlePossiblyHavoc, false),
+  add("klee_never_havoc", handleNeverHavoc, false),
 
   // operator delete[](void*)
   add("_ZdaPv", handleDeleteArray, false),
@@ -1711,6 +1712,78 @@ void SpecialFunctionHandler::handlePossiblyHavoc(ExecutionState &state,
     } else {      
       executor.terminateStateOnError(*s, 
                                      "wrong size given to klee_possibly_havoc", 
+                                     Executor::User);
+    }
+  }
+}
+
+void SpecialFunctionHandler::handleNeverHavoc(ExecutionState &state,
+                                              KInstruction *target,
+                                              std::vector<ref<Expr> > &arguments) {
+  std::string name;
+
+  if(arguments.size() != 3) {
+    executor.terminateStateOnError
+      (state, "Incorrect number of arguments to klee_never_havoc",
+       Executor::User);
+  }
+
+  if (!isa<klee::ConstantExpr>(arguments[0])) {
+    executor.terminateStateOnError
+      (state, "Symbolic address for klee_never_havoc is not supported",
+       Executor::Unhandled);
+    return;
+  }
+  if (!isa<klee::ConstantExpr>(arguments[1])) {
+    executor.terminateStateOnError
+      (state, "Symbolic width for klee_never_havoc is not supported",
+       Executor::Unhandled);
+    return;
+  }
+
+  name = readStringAtAddress(state, arguments[2]);
+
+  if (name.length() == 0) {
+    executor.terminateStateOnError
+      (state, "Empty name for klee_never_havoc",
+       Executor::User);
+    return;
+  }
+
+  Executor::ExactResolutionList rl;
+  executor.resolveExact(state, arguments[0], rl, "never_havoc");
+
+  for (Executor::ExactResolutionList::iterator it = rl.begin(), 
+         ie = rl.end(); it != ie; ++it) {
+    const MemoryObject *mo = it->first.first;
+    mo->setName(name);
+
+    const ObjectState *old = it->first.second;
+    ExecutionState *s = it->second;
+
+    // if (!old->accessible) {
+    //   executor.terminateStateOnError
+    //     (*s, llvm::Twine("cannot make inaccessible object symbolic") +
+    //      "the object was rendered inaccessible due to:" +
+    //      old->inaccessible_message, Executor::Inaccessible);
+    //   return;
+    // }
+
+    // FIXME: Type coercion should be done consistently somewhere.
+    bool res;
+    bool success __attribute__ ((unused)) =
+      executor.solver->mustBeTrue(*s, 
+                                  EqExpr::create(ZExtExpr::create(arguments[1],
+                                                                  Context::get().getPointerWidth()),
+                                                 mo->getSizeExpr()),
+                                  res);
+    assert(success && "FIXME: Unhandled solver failure");
+    
+    if (res) {
+      executor.executeNeverHavoc(*s, mo, name);
+    } else {      
+      executor.terminateStateOnError(*s, 
+                                     "wrong size given to klee_never_havoc", 
                                      Executor::User);
     }
   }

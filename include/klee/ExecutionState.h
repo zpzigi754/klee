@@ -292,9 +292,16 @@ public:
   ///  and values placed at the last havoc event.
   std::map<const MemoryObject *, HavocInfo> havocs;
 
+  /// @brief The list of never havoced memory locations with their names.
+  std::map<const MemoryObject *, std::string> noHavocs;
+
   /// @brief The list of registered havoc mem location names, used to guarantee
   ///  uniqueness of each name.
   std::set<std::string> havocNames;
+
+  /// @brief The list of registered never-havoc mem location names, used to guarantee
+  ///  uniqueness of each name.
+  std::set<std::string> noHavocNames;
 
   /// @brief Set of used array names for this state.  Used to avoid collisions.
   std::set<std::string> arrayNames;
@@ -352,6 +359,7 @@ public:
   ExecutionState *branch();
 
   void addHavocInfo(const MemoryObject *mo, const std::string &name);
+  void addNoHavocInfo(const MemoryObject *mo, const std::string &name);
 
   void pushFrame(KInstIterator caller, KFunction *kf);
   void popFrame();
