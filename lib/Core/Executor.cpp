@@ -1317,9 +1317,39 @@ void Executor::executeCall(ExecutionState &state,
 	 terminateStateOnError(state, "calling function with too few arguments",
                               User);
         return;*/
-	for (unsigned i=0; i<funcArgs; ++i) 
+	for (unsigned i=0; i<funcArgs; ++i) {
             //f->getFunctionType()->getFunctionParamType(i)
-            arguments.push_back(ConstantExpr::create(0, Expr::Int32));
+	    Type *t = f->getFunctionType()->getFunctionParamType(i);
+            if (t->isPointerTy()) {
+		arguments.push_back(ConstantExpr::create(0, Expr::Int32));
+	    } else if (t->isIntegerTy()) {
+		IntegerType* it = (IntegerType *)t;
+		unsigned w = it->getBitWidth();
+		switch(w) {
+		case 1:
+		  arguments.push_back(ConstantExpr::create(0, Expr::Bool));
+		  break;
+		case 8:
+		  arguments.push_back(ConstantExpr::create(0, Expr::Int8));
+		  break;
+		case 16:
+		  arguments.push_back(ConstantExpr::create(0, Expr::Int16));
+		  break;
+		case 32:
+		  arguments.push_back(ConstantExpr::create(0, Expr::Int32));
+		  break;
+		case 64:
+		  arguments.push_back(ConstantExpr::create(0, Expr::Int64));
+		  break;
+		}
+	    } else if (t->isFloatingPointTy()) {
+		arguments.push_back(ConstantExpr::create(0, Expr::Fl80));
+	    } else {
+		terminateStateOnError(state, "calling function with too few arguments",
+                               User);
+	        return;
+	    }
+	}
       }
     } else {
       Expr::Width WordSize = Context::get().getPointerWidth();
