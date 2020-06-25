@@ -313,7 +313,26 @@ bool IntrinsicCleanerPass::runOnBasicBlock(BasicBlock &b, Module &M) {
         dirty = true;
         break;
       }
-
+      case Intrinsic::x86_sse2_psrli_d: {
+	assert(ii->getNumArgOperands() == 2 && "wrong number of arguments");
+	Value *a = ii->getArgOperand(0);
+	assert(a && "Failed to get first argument");
+	new UnreachableInst(ctx, ii);
+	ii->replaceAllUsesWith(a);
+	ii->eraseFromParent();
+	dirty = true;
+	break;
+      }
+      case Intrinsic::x86_sse2_psrl_dq: {
+	assert(ii->getNumArgOperands() == 2 && "wrong number of arguments");
+        Value *a = ii->getArgOperand(0);
+        assert(a && "Failed to get first argument");
+        new UnreachableInst(ctx, ii);
+        ii->replaceAllUsesWith(a);
+        ii->eraseFromParent();
+        dirty = true;
+        break;
+      }
       // consistency fences, just ignore them
       case Intrinsic::x86_sse_sfence:
       case Intrinsic::x86_sse2_lfence:

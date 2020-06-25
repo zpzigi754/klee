@@ -1204,10 +1204,6 @@ void Executor::executeCall(ExecutionState &state,
                            Function *f,
                            std::vector< ref<Expr> > &arguments) {
   Instruction *i = ki->inst;
-  unsigned callingArgs1 = arguments.size();
-  for (unsigned i=0; i<callingArgs1; ++i) 
-      klee_message("Argument %d kind %d", i, arguments[i].get()->getKind());
-
 #if 0
   static StringRef last_called;
   bool dump = true;
@@ -1313,19 +1309,16 @@ void Executor::executeCall(ExecutionState &state,
         klee_warning_once(f, "calling %s with extra arguments.", 
                           f->getName().data());
       } else if (callingArgs < funcArgs) {
-       /*	klee_message("number of arguments expected: %d vs received %d ", (int)funcArgs , (int)callingArgs);
-	 terminateStateOnError(state, "calling function with too few arguments",
+        terminateStateOnError(state, "calling function with too few arguments - gl hf :)",
                               User);
-        return;*/
-	for (unsigned i=0; i<funcArgs; ++i) 
-            //f->getFunctionType()->getFunctionParamType(i)
-            arguments.push_back(ConstantExpr::create(0, Expr::Int32));
+       
+	 return
       }
     } else {
       Expr::Width WordSize = Context::get().getPointerWidth();
 
       if (callingArgs < funcArgs) {
-        terminateStateOnError(state, "calling function with too few arguments",
+        terminateStateOnError(state, "calling function with too few arguments - test :)",
                               User);
         return;
       }
