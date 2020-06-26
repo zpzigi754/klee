@@ -1204,9 +1204,6 @@ void Executor::executeCall(ExecutionState &state,
                            Function *f,
                            std::vector< ref<Expr> > &arguments) {
   Instruction *i = ki->inst;
-  unsigned callingArgs1 = arguments.size();
-  for (unsigned i=0; i<callingArgs1; ++i) 
-      klee_message("Argument %d kind %d", i, arguments[i].get()->getKind());
 
 #if 0
   static StringRef last_called;
@@ -1313,40 +1310,22 @@ void Executor::executeCall(ExecutionState &state,
         klee_warning_once(f, "calling %s with extra arguments.", 
                           f->getName().data());
       } else if (callingArgs < funcArgs) {
-       /*	klee_message("number of arguments expected: %d vs received %d ", (int)funcArgs , (int)callingArgs);
-	 terminateStateOnError(state, "calling function with too few arguments",
-                              User);
-        return;*/
 	for (unsigned i=0; i<funcArgs; ++i) {
-            //f->getFunctionType()->getFunctionParamType(i)
 	    Type *t = f->getFunctionType()->getFunctionParamType(i);
             if (t->isPointerTy()) {
-		arguments.push_back(ConstantExpr::create(0, Expr::Int32));
+		arguments.push_back(ConstantExpr::create(0, Context::get().getPointerWidth()));
 	    } else if (t->isIntegerTy()) {
 		IntegerType* it = (IntegerType *)t;
 		unsigned w = it->getBitWidth();
-		switch(w) {
-		case 1:
-		  arguments.push_back(ConstantExpr::create(0, Expr::Bool));
-		  break;
-		case 8:
-		  arguments.push_back(ConstantExpr::create(0, Expr::Int8));
-		  break;
-		case 16:
-		  arguments.push_back(ConstantExpr::create(0, Expr::Int16));
-		  break;
-		case 32:
-		  arguments.push_back(ConstantExpr::create(0, Expr::Int32));
-		  break;
-		case 64:
-		  arguments.push_back(ConstantExpr::create(0, Expr::Int64));
-		  break;
-		}
-	    } else if (t->isFloatingPointTy()) {
-		arguments.push_back(ConstantExpr::create(0, Expr::Fl80));
+		arguments.push_back(ConstantExpr::create(0, w));
+	    } else if (t->isFloatTy()) {
+		arguments.push_back(ConstantExpr::create(0, 32));
+	    } else if (t->isDoubleTy()) {
+		arguments.push_back(ConstantExpr::create(0, 64));
 	    } else {
-		terminateStateOnError(state, "calling function with too few arguments",
-                               User);
+		terminateStateOnError(state, 
+			"calling function with too few arguments that cannot be made symbolic",
+                         User);
 	        return;
 	    }
 	}
