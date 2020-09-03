@@ -258,7 +258,90 @@ bool IntrinsicCleanerPass::runOnBasicBlock(BasicBlock &b, Module &M) {
         dirty = true;
         break;
       }
-
+      case Intrinsic::x86_sse2_packssdw_128: {
+        assert(ii->getNumArgOperands() == 2 && "wrong number of arguments");
+        Value *a = ii->getArgOperand(0);
+        assert(a && "Failed to get the first argument");
+	Value *b = ii->getArgOperand(1);
+        assert(b && "Failed to get the second argument");
+        new UnreachableInst(ctx, ii);
+        ii->replaceAllUsesWith(a);
+        ii->eraseFromParent();
+        dirty = true;
+        break;
+      }
+      case Intrinsic::x86_sse2_pmovmskb_128: {
+        assert(ii->getNumArgOperands() == 1 && "wrong number of arguments");
+        Value *a = ii->getArgOperand(0);
+        assert(a && "Failed to get the first argument");;
+        new UnreachableInst(ctx, ii);
+        ii->replaceAllUsesWith(a);
+        ii->eraseFromParent();
+        dirty = true;
+        break;
+      }
+      case Intrinsic::x86_sse2_pslli_d: {
+	assert(ii->getNumArgOperands() == 2 && "wrong number of arguments");
+        Value *a = ii->getArgOperand(0);
+        assert(a && "Failed to get the first argument");
+	Value *b = ii->getArgOperand(1);
+        assert(b && "Failed to get the second argument");
+        new UnreachableInst(ctx, ii);
+        ii->replaceAllUsesWith(a);
+        ii->eraseFromParent();
+        dirty = true;
+        break;
+      }
+      case Intrinsic::x86_sse2_pslli_w: {
+	assert(ii->getNumArgOperands() == 2 && "wrong number of arguments");
+        Value *a = ii->getArgOperand(0);
+        assert(a && "Failed to get the first argument");
+	Value *b = ii->getArgOperand(1);
+        assert(a && "Failed to get the second argument");
+        new UnreachableInst(ctx, ii);
+        ii->replaceAllUsesWith(a);
+        ii->eraseFromParent();
+        dirty = true;
+        break;
+      }
+      case Intrinsic::x86_sse2_psrli_w: {
+	assert(ii->getNumArgOperands() == 2 && "wrong number of arguments");
+        Value *a = ii->getArgOperand(0);
+        assert(a && "Failed to get the first argument");
+	Value *b = ii->getArgOperand(1);
+        assert(b && "Failed to get the second argument");
+        new UnreachableInst(ctx, ii);
+        ii->replaceAllUsesWith(a);
+        ii->eraseFromParent();
+        dirty = true;
+        break;
+      }
+      case Intrinsic::x86_sse2_psll_dq: {
+	assert(ii->getNumArgOperands() == 2 && "wrong number of arguments");
+        Value *a = ii->getArgOperand(0);
+        assert(a && "Failed to get the first argument");
+	Value *b = ii->getArgOperand(1);
+        assert(b && "Failed to get the second argument");
+        new UnreachableInst(ctx, ii);
+        ii->replaceAllUsesWith(a);
+        ii->eraseFromParent();
+        dirty = true;
+        break;
+      }
+      case Intrinsic::x86_sse41_pblendw: {
+	assert(ii->getNumArgOperands() == 3 && "wrong number of arguments");
+        Value *a = ii->getArgOperand(0);
+        assert(a && "Failed to get the first argument");
+	Value *b = ii->getArgOperand(1);
+        assert(b && "Failed to get the second argument");
+	Value *c = ii->getArgOperand(2);
+        assert(c && "Failed to get the third argument");
+        new UnreachableInst(ctx, ii);
+        ii->replaceAllUsesWith(a);
+        ii->eraseFromParent();
+        dirty = true;
+        break;
+      }
       // The following instructions are all replaced by an "unreachable" since we don't actually use them...
 
       // ptestz described in http://dpdk.org/ml/archives/dev/2014-August/004567.html
