@@ -1204,6 +1204,7 @@ void Executor::executeCall(ExecutionState &state,
                            Function *f,
                            std::vector< ref<Expr> > &arguments) {
   Instruction *i = ki->inst;
+
 #if 0
   static StringRef last_called;
   bool dump = true;
@@ -1309,9 +1310,25 @@ void Executor::executeCall(ExecutionState &state,
         klee_warning_once(f, "calling %s with extra arguments.", 
                           f->getName().data());
       } else if (callingArgs < funcArgs) {
-        terminateStateOnError(state, "calling function with too few arguments",
-                              User);
-        return;
+	for (unsigned i=0; i<funcArgs; ++i) {
+	    Type *t = f->getFunctionType()->getFunctionParamType(i);
+            if (t->isPointerTy()) {
+		arguments.push_back(ConstantExpr::create(0, Context::get().getPointerWidth()));
+	    } else if (t->isIntegerTy()) {
+		IntegerType* it = (IntegerType *)t;
+		unsigned w = it->getBitWidth();
+		arguments.push_back(ConstantExpr::create(0, w));
+	    } else if (t->isFloatTy()) {
+		arguments.push_back(ConstantExpr::create(0, 32));
+	    } else if (t->isDoubleTy()) {
+		arguments.push_back(ConstantExpr::create(0, 64));
+	    } else {
+		terminateStateOnError(state, 
+			"calling function with too few arguments that cannot be made symbolic",
+                         User);
+	        return;
+	    }
+	}
       }
     } else {
       Expr::Width WordSize = Context::get().getPointerWidth();
