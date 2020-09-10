@@ -6,6 +6,8 @@ Changes:
 - Add memory-access restriction methods to allow/forbid code from accessing specific objects (so that their use as opaque pointers can be enforced)
 - Add read/write intercepts (to model hardware)
 - Add regex support for function aliases (to alias static inline functions whose name is mangled)
+- Add support for calling functions with less arguments than they need (via a cast to a function pointer), which DPDK does
+- Add basic support for some vector instructions; most are just replaced with an "unreachable" instr since we don't actually execute them
 
 
 KLEE Symbolic Virtual Machine
