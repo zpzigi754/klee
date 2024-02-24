@@ -18,7 +18,7 @@ if [ "x${STP_VERSION}" != "x" ]; then
     cd ../../
 
     # Build STP
-    git clone --depth 1 -b "${STP_VERSION}" git://github.com/stp/stp.git src
+    git clone --depth 1 -b "${STP_VERSION}" https://github.com/stp/stp.git src
     mkdir build
     cd build
     # Disabling building of shared libs is a workaround.
