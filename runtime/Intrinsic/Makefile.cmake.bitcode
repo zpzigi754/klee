@@ -10,6 +10,6 @@ LEVEL := ../
 
 include $(LEVEL)/Makefile.cmake.bitcode.config
 
-ARCHIVE_NAME=kleeRuntimeIntrinsic
+MODULE_NAME=kleeRuntimeIntrinsic
 
 include $(LEVEL)/Makefile.cmake.bitcode.rules
