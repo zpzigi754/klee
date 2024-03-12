@@ -223,6 +223,9 @@ public:
   /// @brief Set of used array names for this state.  Used to avoid collisions.
   std::set<std::string> arrayNames;
 
+  /// @brief Call path
+  std::string callPath;
+
   /// @brief The objects handling the klee_open_merge calls this state ran through
   std::vector<ref<MergeHandler>> openMergeStack;
 

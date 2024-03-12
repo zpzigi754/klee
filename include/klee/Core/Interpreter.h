@@ -47,6 +47,7 @@ public:
   virtual void processTestCase(const ExecutionState &state,
                                const char *err,
                                const char *suffix) = 0;
+  virtual void processCallPath(const ExecutionState &state) = 0;
 };
 
 class Interpreter {
@@ -156,6 +157,7 @@ public:
                                 std::string &res,
                                 LogType logFormat = STP) = 0;
 
+  virtual std::string getPath(const ExecutionState &state) = 0;
   virtual bool getSymbolicSolution(const ExecutionState &state,
                                    std::vector<
                                    std::pair<std::string,

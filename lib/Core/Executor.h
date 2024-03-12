@@ -564,6 +564,8 @@ public:
                         Interpreter::LogType logFormat =
                             Interpreter::STP) override;
 
+  std::string getPath(const ExecutionState &state)
+      override;
   bool getSymbolicSolution(
       const ExecutionState &state,
       std::vector<std::pair<std::string, std::vector<unsigned char>>> &res)

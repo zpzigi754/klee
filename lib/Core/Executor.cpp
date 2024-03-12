@@ -1708,6 +1708,8 @@ ref<klee::ConstantExpr> Executor::getEhTypeidFor(ref<Expr> type_info) {
 
 void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
                            std::vector<ref<Expr>> &arguments) {
+  state.callPath += ("call: " + f->getName() + "\n").str();  
+
   Instruction *i = ki->inst;
   if (isa_and_nonnull<DbgInfoIntrinsic>(i))
     return;
@@ -3764,6 +3766,7 @@ void Executor::terminateState(ExecutionState &state,
                       "replay did not consume all objects in test input.");
   }
 
+  interpreterHandler->processCallPath(state);
   interpreterHandler->incPathsExplored();
   executionTree->setTerminationType(state, reason);
 
@@ -4817,6 +4820,10 @@ void Executor::getConstraintLog(const ExecutionState &state, std::string &res,
   default:
     klee_warning("Executor::getConstraintLog() : Log format not supported!");
   }
+}
+
+std::string Executor::getPath(const ExecutionState &state) {
+  return state.callPath;
 }
 
 bool Executor::getSymbolicSolution(const ExecutionState &state,

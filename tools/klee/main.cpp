@@ -307,6 +307,7 @@ private:
   unsigned m_numGeneratedTests; // Number of tests successfully generated
   unsigned m_pathsCompleted; // number of completed paths
   unsigned m_pathsExplored; // number of partially explored and completed paths
+  unsigned m_callPathIndex; // number of call path strings dumped so far
 
   // used for writing .ktest files
   int m_argc;
@@ -330,6 +331,7 @@ public:
   void processTestCase(const ExecutionState  &state,
                        const char *errorMessage,
                        const char *errorSuffix);
+  void processCallPath(const ExecutionState &state);
 
   std::string getOutputFilename(const std::string &filename);
   std::unique_ptr<llvm::raw_fd_ostream> openOutputFile(const std::string &filename);
@@ -349,7 +351,7 @@ public:
 KleeHandler::KleeHandler(int argc, char **argv)
     : m_interpreter(0), m_pathWriter(0), m_symPathWriter(0),
       m_outputDirectory(), m_numTotalTests(0), m_numGeneratedTests(0),
-      m_pathsCompleted(0), m_pathsExplored(0), m_argc(argc), m_argv(argv) {
+      m_pathsCompleted(0), m_pathsExplored(0), m_callPathIndex(0), m_argc(argc), m_argv(argv) {
 
   // create output directory (OutputDir or "klee-out-<i>")
   bool dir_given = OutputDir != "";
@@ -606,6 +608,15 @@ void KleeHandler::processTestCase(const ExecutionState &state,
     m_interpreter->prepareForEarlyExit();
     klee_error("EXITING ON ERROR:\n%s\n", errorMessage);
   }
+}
+
+void KleeHandler::processCallPath(const ExecutionState &state) {
+  unsigned id = ++m_callPathIndex;
+  std::stringstream filename;
+  filename << "call-path" << std::setfill('0') << std::setw(6) << id << '.' << "txt";
+  std::unique_ptr<llvm::raw_fd_ostream> f = openOutputFile(filename.str());
+  std::string callPath = m_interpreter->getPath(state);
+  *f << callPath;
 }
 
   // load a .path file

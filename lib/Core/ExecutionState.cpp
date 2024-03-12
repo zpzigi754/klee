@@ -110,6 +110,7 @@ ExecutionState::ExecutionState(const ExecutionState& state):
     arrayNames(state.arrayNames),
     openMergeStack(state.openMergeStack),
     steppedInstructions(state.steppedInstructions),
+    callPath(state.callPath),
     instsSinceCovNew(state.instsSinceCovNew),
     unwindingInformation(state.unwindingInformation
                              ? state.unwindingInformation->clone()
