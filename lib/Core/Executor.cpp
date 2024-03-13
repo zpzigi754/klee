@@ -4430,6 +4430,13 @@ void Executor::executeMemoryOperation(ExecutionState &state,
 
   address = optimizer.optimizeExpr(address, true);
 
+  if (!isa<ConstantExpr>(address)) {
+    printf("\n");
+    printf("Some symbolic indexing going on here:\n");
+    llvm::errs() << state.pc->getSourceLocation();
+    state.dumpStack(llvm::errs());
+  }
+
   ObjectPair op;
   bool success;
   solver->setTimeout(coreSolverTimeout);
