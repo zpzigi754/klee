@@ -28,6 +28,10 @@
 #include <set>
 #include <vector>
 
+namespace llvm {
+  class Function;
+}
+
 namespace klee {
 class Array;
 class CallPathNode;
@@ -224,7 +228,7 @@ public:
   std::set<std::string> arrayNames;
 
   /// @brief Call path
-  std::string callPath;
+  std::vector<llvm::Function *> callPath;
 
   /// @brief The objects handling the klee_open_merge calls this state ran through
   std::vector<ref<MergeHandler>> openMergeStack;

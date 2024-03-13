@@ -1708,7 +1708,7 @@ ref<klee::ConstantExpr> Executor::getEhTypeidFor(ref<Expr> type_info) {
 
 void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
                            std::vector<ref<Expr>> &arguments) {
-  state.callPath += ("call: " + f->getName() + "\n").str();  
+  state.callPath.push_back(f);
 
   Instruction *i = ki->inst;
   if (isa_and_nonnull<DbgInfoIntrinsic>(i))
@@ -4829,7 +4829,7 @@ void Executor::getConstraintLog(const ExecutionState &state, std::string &res,
   }
 }
 
-std::string Executor::getPath(const ExecutionState &state) {
+std::vector<llvm::Function *> Executor::getPath(const ExecutionState &state) {
   return state.callPath;
 }
 

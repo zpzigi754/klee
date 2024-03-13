@@ -564,7 +564,7 @@ public:
                         Interpreter::LogType logFormat =
                             Interpreter::STP) override;
 
-  std::string getPath(const ExecutionState &state)
+  std::vector<llvm::Function *> getPath(const ExecutionState &state)
       override;
   bool getSymbolicSolution(
       const ExecutionState &state,
