@@ -23,6 +23,7 @@
 #include "klee/Support/OptionCategories.h"
 #include "klee/Support/PrintVersion.h"
 #include "klee/System/Time.h"
+#include "klee/Expr/Constraints.h"
 
 #include "klee/Support/CompilerWarning.h"
 DISABLE_WARNING_PUSH
@@ -673,6 +674,12 @@ void KleeHandler::processCallPath(const ExecutionState &state) {
       }
     }
     *file <<"\n";
+  }
+  *file <<";;-- Constraints --\n";
+  ConstraintSet constraints = m_interpreter->getConstraint(state);
+  for (ConstraintSet::constraint_iterator ci = constraints.begin(),
+         cEnd = constraints.end(); ci != cEnd; ++ci) {
+    *file <<**ci<<"\n";
   }
 }
 

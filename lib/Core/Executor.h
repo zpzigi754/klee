@@ -564,6 +564,8 @@ public:
                         Interpreter::LogType logFormat =
                             Interpreter::STP) override;
 
+  ConstraintSet getConstraint(const ExecutionState &state)
+      override;
   std::vector<CallInfo> getPath(const ExecutionState &state)
       override;
   bool getSymbolicSolution(

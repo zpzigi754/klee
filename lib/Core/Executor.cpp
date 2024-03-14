@@ -4901,6 +4901,10 @@ void Executor::getConstraintLog(const ExecutionState &state, std::string &res,
   }
 }
 
+ConstraintSet Executor::getConstraint(const ExecutionState &state) {
+  return state.constraints;
+}
+
 std::vector<CallInfo> Executor::getPath(const ExecutionState &state) {
   return state.callPath;
 }

@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 #include "klee/Expr/Expr.h"
+#include "klee/Expr/Constraints.h"
 
 struct KTest;
 
@@ -160,6 +161,7 @@ public:
                                 std::string &res,
                                 LogType logFormat = STP) = 0;
 
+  virtual ConstraintSet getConstraint(const ExecutionState &state) = 0;
   virtual std::vector<CallInfo> getPath(const ExecutionState &state) = 0;
   virtual bool getSymbolicSolution(const ExecutionState &state,
                                    std::vector<
