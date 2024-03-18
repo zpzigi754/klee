@@ -1708,7 +1708,8 @@ ref<klee::ConstantExpr> Executor::getEhTypeidFor(ref<Expr> type_info) {
 
 void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
                            std::vector<ref<Expr>> &arguments) {
-  state.callPath.push_back(f);
+  if (interpreterHandler->functionInteresting(f))
+    state.callPath.push_back(CallInfo(f, arguments));
 
   Instruction *i = ki->inst;
   if (isa_and_nonnull<DbgInfoIntrinsic>(i))
@@ -2131,6 +2132,19 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     
     if (!isVoidReturn) {
       result = eval(ki, 0, state).value;
+    }
+
+    Function* f = ri->getParent()->getParent();
+    if (interpreterHandler->functionInteresting(f)) {
+      // XXX: the below assertion does not hold for some reasons
+      //assert(f == state.callPath.back().f);
+      state.callPath.back().ret = result;
+      //if (isVoidReturn) {
+      //  state.retPath.push_back(ri->getParent()->getParent()/*result*/);//May be replace by a special indicator?
+      //} else {
+      //  state.retPath.push_back(ri->getParent()->getParent()/*result*/);
+      //}
+    } else {
     }
     
     if (state.stack.size() <= 1) {
@@ -4829,7 +4843,7 @@ void Executor::getConstraintLog(const ExecutionState &state, std::string &res,
   }
 }
 
-std::vector<llvm::Function *> Executor::getPath(const ExecutionState &state) {
+std::vector<CallInfo> Executor::getPath(const ExecutionState &state) {
   return state.callPath;
 }
 

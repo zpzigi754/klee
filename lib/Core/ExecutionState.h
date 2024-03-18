@@ -228,7 +228,7 @@ public:
   std::set<std::string> arrayNames;
 
   /// @brief Call path
-  std::vector<llvm::Function *> callPath;
+  std::vector<CallInfo> callPath;
 
   /// @brief The objects handling the klee_open_merge calls this state ran through
   std::vector<ref<MergeHandler>> openMergeStack;

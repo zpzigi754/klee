@@ -629,12 +629,21 @@ void KleeHandler::processCallPath(const ExecutionState &state) {
   std::stringstream filename;
   filename << "call-path" << std::setfill('0') << std::setw(6) << id << '.' << "txt";
   std::unique_ptr<llvm::raw_fd_ostream> file = openOutputFile(filename.str());
-  std::vector<llvm::Function *> callPath = m_interpreter->getPath(state);
-  for (std::vector<Function*>::const_iterator iter = callPath.begin(),
+  std::vector<CallInfo> callPath = m_interpreter->getPath(state);
+  for (std::vector<CallInfo>::const_iterator iter = callPath.begin(),
          end = callPath.end(); iter != end; ++iter) {
-    Function* fun = *iter;
-    if (functionInteresting(fun))
-      *file << fun->getName() <<"\n";
+    const CallInfo& ci = *iter;
+    *file << ci.f->getName() <<"(";
+    for (std::vector< ref<Expr> >::const_iterator argIter = ci.args.begin(),
+           end = ci.args.end(); argIter != end; ++argIter)
+      *file << *argIter <<",";
+    *file <<") -> ";
+    if (ci.ret.isNull()) {
+      *file <<"[]";
+    } else {
+      *file <<*(ci.ret.get());
+    }
+    *file <<"\n";
   }
 }
 

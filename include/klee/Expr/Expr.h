@@ -32,6 +32,7 @@ DISABLE_WARNING_POP
 namespace llvm {
   class Type;
   class raw_ostream;
+  class Function;
 }
 
 namespace klee {
@@ -299,6 +300,14 @@ public:
 private:
   typedef llvm::DenseSet<std::pair<const Expr *, const Expr *> > ExprEquivSet;
   int compare(const Expr &b, ExprEquivSet &equivs) const;
+};
+
+struct CallInfo {
+  llvm::Function* f;
+  std::vector< ref<Expr> > args;
+  ref<Expr> ret;
+  CallInfo(llvm::Function* f_, const std::vector< ref<Expr> > &args_)
+    :f(f_), args(args_), ret() {}
 };
 
 struct Expr::CreateArg {

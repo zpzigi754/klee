@@ -15,6 +15,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include "klee/Expr/Expr.h"
 
 struct KTest;
 
@@ -40,6 +41,8 @@ public:
 
   virtual std::string getOutputFilename(const std::string &filename) = 0;
   virtual std::unique_ptr<llvm::raw_fd_ostream> openOutputFile(const std::string &filename) = 0;
+
+  virtual bool functionInteresting(const llvm::Function* fun) = 0;
 
   virtual void incPathsCompleted() = 0;
   virtual void incPathsExplored(std::uint32_t num = 1) = 0;
@@ -157,7 +160,7 @@ public:
                                 std::string &res,
                                 LogType logFormat = STP) = 0;
 
-  virtual std::vector<llvm::Function *> getPath(const ExecutionState &state) = 0;
+  virtual std::vector<CallInfo> getPath(const ExecutionState &state) = 0;
   virtual bool getSymbolicSolution(const ExecutionState &state,
                                    std::vector<
                                    std::pair<std::string,
