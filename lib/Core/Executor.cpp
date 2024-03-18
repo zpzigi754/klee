@@ -1708,8 +1708,41 @@ ref<klee::ConstantExpr> Executor::getEhTypeidFor(ref<Expr> type_info) {
 
 void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
                            std::vector<ref<Expr>> &arguments) {
-  if (interpreterHandler->functionInteresting(f))
-    state.callPath.push_back(CallInfo(f, arguments));
+  if (interpreterHandler->functionInteresting(f)){
+    const FunctionType *fType =
+      // XXX: PointerType::getElementType() and Type::getPointerElementType() is deprecated.
+      //      see https://llvm.org/docs/OpaquePointers.html
+      f->getFunctionType();
+    assert(!fType->isVarArg() && "The interesting functions must not be vararg.");
+    assert(arguments.size() == fType->getNumParams() && "Incorrect call.");
+    int numParams = fType->getNumParams();
+    std::vector< ref<Expr> > args;
+    args.reserve(numParams);
+    for (int i = 0; i < numParams; ++i) {
+      if (fType->getParamType(i)->isPointerTy()) {
+        ref<Expr> address = arguments[i];
+        assert(isa<ConstantExpr>(address) && "No support for symbolic pointers here.");
+        //TODO: check for null pointer.
+        ObjectPair op;
+        bool success = state.addressSpace.resolveOne(cast<ConstantExpr>(address), op);
+        // XXX: the below assertion does not hold for some reasons
+        //assert(success && "Unknown pointer argument!");
+        const MemoryObject *mo = op.first;
+        const ObjectState *os = op.second;
+        //FIXME: assume inbounds.
+        // XXX: mo->getOffsetExpr(address) causes an abort for some reasons
+        //ref<Expr> offset = mo->getOffsetExpr(address);
+        //Expr::Width type =
+        //  getWidthForLLVMType(( cast<PointerType>(fType->getParamType(i)) )->
+        //                      getElementType());	
+        //args.push_back(os->read(offset, type));
+      } else {
+        args.push_back(arguments[i]);
+      }
+    }
+    state.callPath.push_back(CallInfo(f, args));
+  }
+
 
   Instruction *i = ki->inst;
   if (isa_and_nonnull<DbgInfoIntrinsic>(i))
