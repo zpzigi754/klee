@@ -1708,42 +1708,6 @@ ref<klee::ConstantExpr> Executor::getEhTypeidFor(ref<Expr> type_info) {
 
 void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
                            std::vector<ref<Expr>> &arguments) {
-  if (interpreterHandler->functionInteresting(f)){
-    const FunctionType *fType =
-      // XXX: PointerType::getElementType() and Type::getPointerElementType() is deprecated.
-      //      see https://llvm.org/docs/OpaquePointers.html
-      f->getFunctionType();
-    assert(!fType->isVarArg() && "The interesting functions must not be vararg.");
-    assert(arguments.size() == fType->getNumParams() && "Incorrect call.");
-    int numParams = fType->getNumParams();
-    std::vector< ref<Expr> > args;
-    args.reserve(numParams);
-    for (int i = 0; i < numParams; ++i) {
-      if (fType->getParamType(i)->isPointerTy()) {
-        ref<Expr> address = arguments[i];
-        assert(isa<ConstantExpr>(address) && "No support for symbolic pointers here.");
-        //TODO: check for null pointer.
-        ObjectPair op;
-        bool success = state.addressSpace.resolveOne(cast<ConstantExpr>(address), op);
-        // XXX: the below assertion does not hold for some reasons
-        //assert(success && "Unknown pointer argument!");
-        const MemoryObject *mo = op.first;
-        const ObjectState *os = op.second;
-        //FIXME: assume inbounds.
-        // XXX: mo->getOffsetExpr(address) causes an abort for some reasons
-        //ref<Expr> offset = mo->getOffsetExpr(address);
-        //Expr::Width type =
-        //  getWidthForLLVMType(( cast<PointerType>(fType->getParamType(i)) )->
-        //                      getElementType());	
-        //args.push_back(os->read(offset, type));
-      } else {
-        args.push_back(arguments[i]);
-      }
-    }
-    state.callPath.push_back(CallInfo(f, args));
-  }
-
-
   Instruction *i = ki->inst;
   if (isa_and_nonnull<DbgInfoIntrinsic>(i))
     return;
@@ -1983,6 +1947,59 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
     state.pushFrame(state.prevPC, kf);
     state.pc = kf->instructions;
 
+    if (interpreterHandler->functionInteresting(f)){
+      const FunctionType *fType =
+        // XXX: PointerType::getElementType() and Type::getPointerElementType() is deprecated.
+        //      see https://llvm.org/docs/OpaquePointers.html
+        f->getFunctionType();
+      assert(!fType->isVarArg() && "The interesting functions must not be vararg.");
+      assert(arguments.size() == fType->getNumParams() && "Incorrect call.");
+      int numParams = fType->getNumParams();
+      state.callPath.push_back(CallInfo());
+      CallInfo *info = &state.callPath.back();
+      info->f = f;
+      info->args.reserve(numParams);
+      for (int i = 0; i < numParams; ++i) {
+        llvm::Type *paramType = fType->getParamType(i);
+        info->args.push_back(CallArg());
+        CallArg *arg = &info->args.back();
+        arg->expr = arguments[i];
+        arg->isPtr = paramType->isPointerTy();
+        if (arg->isPtr) {
+          // XXX: check the below again    
+          //      is it equivalent to `(cast<PointerType>(paramType))->getElementType()`?
+          llvm::Type *elementType = paramType;
+          assert(isa<ConstantExpr>(arguments[i]) &&
+                 "No support for symbolic pointers here.");
+          //TODO: check for null pointer.
+          ObjectPair op;
+          ref<ConstantExpr> address = cast<ConstantExpr>(arguments[i]);
+          if (elementType->isFunctionTy()) {
+            uint64_t addr = address->getZExtValue();
+            arg->funPtr = (Function*) addr;
+          } else {
+            bool success = state.addressSpace.resolveOne(address, op);
+            // XXX: the below assertion does not hold for some reasons
+            //assert(success && "Unknown pointer argument!"); //TODO: Handle function pointers
+            // XXX: the added handler
+	    if (success) {
+              const MemoryObject *mo = op.first;
+              const ObjectState *os = op.second;
+              //FIXME: assume inbounds.
+              // XXX: mo->getOffsetExpr(address) caused an abort without the success check
+              ref<Expr> offset = mo->getOffsetExpr(address);
+              Expr::Width type = getWidthForLLVMType(elementType);
+              arg->outWidth = type;
+              arg->val = os->read(offset, type);
+              arg->funPtr = NULL;
+              // XXX: the added statement
+              arg->isValSuccess = true;
+            }
+          }
+        }
+      }
+    }
+
     if (statsTracker)
       statsTracker->framePushed(state, &state.stack[state.stack.size() - 2]);
 
@@ -2171,7 +2188,34 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     if (interpreterHandler->functionInteresting(f)) {
       // XXX: the below assertion does not hold for some reasons
       //assert(f == state.callPath.back().f);
-      state.callPath.back().ret = result;
+      CallInfo *info = &state.callPath.back();
+      info->ret = result;
+      //const FunctionType *fType =
+      //  dyn_cast<FunctionType>(cast<PointerType>(f->getType())->getElementType());
+      //int numParams = fType->getNumParams();
+
+      int numParams = info->args.size();
+      for (int i = 0; i < numParams; ++i) {
+        CallArg *arg = &info->args[i];
+        if (arg->isPtr && arg->funPtr == NULL) {
+          ref<ConstantExpr> address = cast<ConstantExpr>(arg->expr);
+          ObjectPair op;
+          bool success = state.addressSpace.resolveOne(address, op);
+          // XXX: the below assertion does not hold for some reasons
+          //assert(success && "Unknown pointer argument!");
+          // XXX: the added handler
+          if (success) {
+            const MemoryObject *mo = op.first;
+            const ObjectState *os = op.second;
+            //FIXME: assume inbounds.
+            // XXX: mo->getOffsetExpr(address) caused an abort without the success check
+            ref<Expr> offset = mo->getOffsetExpr(address);
+            info->args[i].outVal = os->read(offset, arg->outWidth);
+            // XXX: the added statement
+            info->args[i].isOutSuccess = true;
+          }
+        }
+      }
       //if (isVoidReturn) {
       //  state.retPath.push_back(ri->getParent()->getParent()/*result*/);//May be replace by a special indicator?
       //} else {
