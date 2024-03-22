@@ -1706,6 +1706,94 @@ ref<klee::ConstantExpr> Executor::getEhTypeidFor(ref<Expr> type_info) {
   return res;
 }
 
+ref<Expr> readMemoryChunk(ref<Expr> addr, Expr::Width width,
+                          const ExecutionState& state) {
+  ObjectPair op;
+  ref<klee::ConstantExpr> address = cast<klee::ConstantExpr>(addr);
+  bool success = state.addressSpace.resolveOne(address, op);
+  // XXX: the below assert does not hold for some reasons
+  //assert(success && "Unknown pointer result!");
+  // XXX: the added check
+  if (success) {
+    const MemoryObject *mo = op.first;
+    const ObjectState *os = op.second;
+    //FIXME: assume inbounds.
+    // XXX: mo->getOffsetExpr(address) caused an abort without the success check
+    ref<Expr> offset = mo->getOffsetExpr(address);
+    return os->read(offset, width);
+  } else {
+    // TODO: return the right value
+    return addr;
+  }
+}
+
+void klee::FillCallInfoInput(Function* f,
+                             const std::vector< ref<Expr> > &arguments,
+                             const ExecutionState& state,
+                             const Executor& exec,
+                             CallInfo* info) {
+  const FunctionType *fType =
+      // XXX: PointerType::getElementType() and Type::getPointerElementType() is deprecated.
+      //      see https://llvm.org/docs/OpaquePointers.html
+      //      check the below again. Is it equivalent to 
+      //     `dyn_cast<FunctionType>(cast<PointerType>(f->getType())->getElementType())`?
+      f->getFunctionType();
+  assert(!fType->isVarArg() && "The interesting functions must not be vararg.");
+  assert(arguments.size() == fType->getNumParams() && "Incorrect call.");
+  int numParams = fType->getNumParams();
+  info->f = f;
+  info->args.reserve(numParams);
+  Function::arg_iterator aIter = f->arg_begin();
+  for (int i = 0; i < numParams; ++i, ++aIter) {
+    StringRef name = aIter->getName();
+    //Skip the size field of the boundptr structure.
+    if (!name.endswith(".coerce1")) {
+      llvm::Type *paramType = fType->getParamType(i);
+      info->args.push_back(CallArg());
+      CallArg *arg = &info->args.back();
+      arg->expr = arguments[i];
+      arg->isPtr = paramType->isPointerTy();
+      if (arg->isPtr) {
+        llvm::Type *elementType =
+            //  XXX: check the below agin. Is it equivalent to
+            //      `(cast<PointerType>(paramType))->getElementType()`?
+            paramType;
+        assert(isa<klee::ConstantExpr>(arguments[i]) &&
+               "No support for symbolic pointers here.");
+        //TODO: check for null pointer.
+        ref<klee::ConstantExpr> address = cast<klee::ConstantExpr>(arguments[i]);
+        if (elementType->isFunctionTy()) {
+          uint64_t addr = address->getZExtValue();
+          arg->funPtr = (Function*) addr;
+        } else {
+          Expr::Width type = exec.getWidthForLLVMType(elementType);
+          if (name.endswith(".coerce0")) {
+            int suffix_size = sizeof(".coerce0")/sizeof('.') -
+              1/*account for the '\0' */;
+            StringRef actualName = name.drop_back(suffix_size);
+            StringRef size_field_name =
+              Twine(actualName).concat(".coerce1").str();
+            Function::arg_iterator next = aIter;
+            next++;
+            assert((next->getName() == size_field_name) &&
+                   "The coerced structure is laid down in an unexpected way.");
+            assert(unsigned(i)+1 < arguments.size() &&
+                   "There must be another field of this structure");
+            ref<Expr> size_field_e = arguments[i+1];
+            assert(isa<klee::ConstantExpr>(size_field_e) &&
+                   "The size must be a compile-time constant.");
+            ref<ConstantExpr> size_field = cast<klee::ConstantExpr>(size_field_e);
+            type = 8*size_field->getZExtValue();
+          }
+          arg->outWidth = type;
+          arg->val = readMemoryChunk(address, type, state);
+          arg->funPtr = NULL;
+        }
+      }
+    }
+  }
+}
+
 void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
                            std::vector<ref<Expr>> &arguments) {
   Instruction *i = ki->inst;
@@ -1948,56 +2036,9 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
     state.pc = kf->instructions;
 
     if (interpreterHandler->functionInteresting(f)){
-      const FunctionType *fType =
-        // XXX: PointerType::getElementType() and Type::getPointerElementType() is deprecated.
-        //      see https://llvm.org/docs/OpaquePointers.html
-        f->getFunctionType();
-      assert(!fType->isVarArg() && "The interesting functions must not be vararg.");
-      assert(arguments.size() == fType->getNumParams() && "Incorrect call.");
-      int numParams = fType->getNumParams();
       state.callPath.push_back(CallInfo());
       CallInfo *info = &state.callPath.back();
-      info->f = f;
-      info->args.reserve(numParams);
-      for (int i = 0; i < numParams; ++i) {
-        llvm::Type *paramType = fType->getParamType(i);
-        info->args.push_back(CallArg());
-        CallArg *arg = &info->args.back();
-        arg->expr = arguments[i];
-        arg->isPtr = paramType->isPointerTy();
-        if (arg->isPtr) {
-          // XXX: check the below again    
-          //      is it equivalent to `(cast<PointerType>(paramType))->getElementType()`?
-          llvm::Type *elementType = paramType;
-          assert(isa<ConstantExpr>(arguments[i]) &&
-                 "No support for symbolic pointers here.");
-          //TODO: check for null pointer.
-          ref<ConstantExpr> address = cast<ConstantExpr>(arguments[i]);
-          if (elementType->isFunctionTy()) {
-            uint64_t addr = address->getZExtValue();
-            arg->funPtr = (Function*) addr;
-          } else {
-            ObjectPair op;
-            bool success = state.addressSpace.resolveOne(address, op);
-            // XXX: the below assertion does not hold for some reasons
-            //assert(success && "Unknown pointer argument!");
-            // XXX: the added handler
-	    if (success) {
-              const MemoryObject *mo = op.first;
-              const ObjectState *os = op.second;
-              //FIXME: assume inbounds.
-              // XXX: mo->getOffsetExpr(address) caused an abort without the success check
-              ref<Expr> offset = mo->getOffsetExpr(address);
-              Expr::Width type = getWidthForLLVMType(elementType);
-              arg->outWidth = type;
-              arg->val = os->read(offset, type);
-              arg->funPtr = NULL;
-              // XXX: the added statement
-              arg->isValSuccess = true;
-            }
-          }
-        }
-      }
+      FillCallInfoInput(f, arguments, state, *this, info);
     }
 
     if (statsTracker)
@@ -2169,6 +2210,91 @@ Function *Executor::getTargetFunction(Value *calledVal) {
   }
 }
 
+void klee::FillCallInfoOutput(Function* f,
+                              bool isVoidReturn,
+                              ref<Expr> result,
+                              const ExecutionState& state,
+                              const Executor& exec,
+                              CallInfo* info) {
+  llvm::Type *retType =
+    // XXX: check the below again. Is it equivalent to 
+    //     `(dyn_cast<FunctionType>(cast<PointerType>(f->getType())->getElementType()))->`?
+    (f->getFunctionType())->
+    getReturnType();
+  if (!isVoidReturn) {
+    info->ret.expr = result;
+    info->ret.isPtr = retType->isPointerTy();
+    if (info->ret.isPtr) {
+      // XXX: check the below again
+      //      is it equivalent to `(cast<PointerType>(retType))->getElementType()`?
+      llvm::Type *elementType = retType;
+      assert(isa<klee::ConstantExpr>(result) &&
+             "No support for symbolic pointer return values.");
+      ref<klee::ConstantExpr> address = cast<klee::ConstantExpr>(result);
+      if (elementType->isFunctionTy()) {
+        uint64_t addr = address->getZExtValue();
+        info->ret.funPtr = (Function*) addr;
+      } else {
+        info->ret.val = readMemoryChunk(address,
+                                        exec.getWidthForLLVMType(elementType),
+                                        state);
+        info->ret.funPtr = NULL;
+	// XXX: the added statement
+	info->ret.isValSuccess = true;
+      }
+    }
+    if (retType->isStructTy()) {
+      llvm::StructType *retS = cast<llvm::StructType>(retType);
+      assert(retS->getNumElements() == 2);
+      llvm::Type* ptrType = retS->getElementType(0);
+      llvm::Type* sizeType = retS->getElementType(1);
+      assert(ptrType->isPointerTy());
+      assert(sizeType->isIntegerTy());
+      assert(isa<klee::ConstantExpr>(result));
+      ref<klee::ConstantExpr> rez = cast<klee::ConstantExpr>(result);
+      ref<klee::ConstantExpr> rezP =
+        cast<klee::ConstantExpr>(ExtractExpr::create
+                                 (rez, 0, exec.getWidthForLLVMType(ptrType)));
+      ref<klee::ConstantExpr> rezS =
+        cast<klee::ConstantExpr>(ExtractExpr::create
+                                 (rez, exec.getWidthForLLVMType(ptrType),
+                                  exec.getWidthForLLVMType(sizeType)) );
+      Expr::Width width = 8*rezS->getZExtValue();
+      info->ret.isPtr = true;
+      info->ret.val = readMemoryChunk(rezP, width, state);
+      info->ret.funPtr = NULL;
+      info->ret.expr = rezP;
+    }
+  }
+
+  int numParams = info->args.size();
+  for (int i = 0; i < numParams; ++i) {
+    CallArg *arg = &info->args[i];
+    if (arg->isPtr && arg->funPtr == NULL) {
+      ref<klee::ConstantExpr> address = cast<klee::ConstantExpr>(arg->expr);
+      ObjectPair op;
+      bool success = state.addressSpace.resolveOne(address, op);
+      // XXX: the below assertion does not hold for some reasons
+      //assert(success && "Unknown pointer argument!");
+      // XXX: the added check
+      if (success) {
+        const MemoryObject *mo = op.first;
+        const ObjectState *os = op.second;
+        klee_message("output mo name: %s, size: %u, id: %u, addr:%lu\n",
+                     mo->name.c_str(), mo->size, mo->id, mo->address);
+        // XXX: the below would overflow the messages
+        //os->print();
+
+        //FIXME: assume inbounds.
+        ref<Expr> offset = mo->getOffsetExpr(address);
+        info->args[i].outVal = os->read(offset, arg->outWidth);
+        // XXX: the added statement
+        info->args[i].isOutSuccess = true;
+      }
+    }
+  }
+}
+
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
   switch (i->getOpcode()) {
@@ -2189,68 +2315,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // XXX: the below assertion does not hold for some reasons
       //assert(f == state.callPath.back().f);
       CallInfo *info = &state.callPath.back();
-      llvm::Type *retType =
-        // XXX: check the below again. 
-        //      is it equivalent to `(dyn_cast<FunctionType>(cast<PointerType>(f->getType())->getElementType()))->`
-        (f->getFunctionType())->
-        getReturnType();
-      info->ret.expr = result;
-      info->ret.isPtr = retType->isPointerTy();
-      if (info->ret.isPtr) {
-        // XXX: check the below again
-        //      it is equivalent to `(cast<PointerType>(retType))->getElementType()`?
-        llvm::Type *elementType = retType;
-        assert(isa<ConstantExpr>(result) &&
-               "No support for symbolic pointer return values.");
-        ref<ConstantExpr> address = cast<ConstantExpr>(result);
-        if (elementType->isFunctionTy()) {
-          uint64_t addr = address->getZExtValue();
-          info->ret.funPtr = (Function*) addr;
-        } else {
-          ObjectPair op;
-          bool success = state.addressSpace.resolveOne(address, op);
-          assert(success && "Unknown pointer result!");
-          const MemoryObject *mo = op.first;
-          const ObjectState *os = op.second;
-          //FIXME: assume inbounds.
-          ref<Expr> offset = mo->getOffsetExpr(address);
-          Expr::Width width = getWidthForLLVMType(elementType);
-          info->ret.val = os->read(offset, width);
-          info->ret.funPtr = NULL;
-        }
-      }
-      //const FunctionType *fType =
-      //  dyn_cast<FunctionType>(cast<PointerType>(f->getType())->getElementType());
-      //int numParams = fType->getNumParams();
-
-      int numParams = info->args.size();
-      for (int i = 0; i < numParams; ++i) {
-        CallArg *arg = &info->args[i];
-        if (arg->isPtr && arg->funPtr == NULL) {
-          ref<ConstantExpr> address = cast<ConstantExpr>(arg->expr);
-          ObjectPair op;
-          bool success = state.addressSpace.resolveOne(address, op);
-          // XXX: the below assertion does not hold for some reasons
-          //assert(success && "Unknown pointer argument!");
-          // XXX: the added handler
-          if (success) {
-            const MemoryObject *mo = op.first;
-            const ObjectState *os = op.second;
-            //FIXME: assume inbounds.
-            // XXX: mo->getOffsetExpr(address) caused an abort without the success check
-            ref<Expr> offset = mo->getOffsetExpr(address);
-            info->args[i].outVal = os->read(offset, arg->outWidth);
-            // XXX: the added statement
-            info->args[i].isOutSuccess = true;
-          }
-        }
-      }
-      //if (isVoidReturn) {
-      //  state.retPath.push_back(ri->getParent()->getParent()/*result*/);//May be replace by a special indicator?
-      //} else {
-      //  state.retPath.push_back(ri->getParent()->getParent()/*result*/);
-      //}
-    } else {
+      FillCallInfoOutput(f, isVoidReturn, result, state, *this, info);
     }
     
     if (state.stack.size() <= 1) {

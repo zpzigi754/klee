@@ -310,7 +310,6 @@ struct CallArg {
   Expr::Width outWidth;
   llvm::Function* funPtr;
   // XXX: the below are temporarily added fields
-  bool isValSuccess;
   bool isOutSuccess;
 };
 
@@ -319,6 +318,8 @@ struct RetVal {
   bool isPtr;
   ref<Expr> val;
   llvm::Function* funPtr;
+  // XXX: the below is temporarily added field
+  bool isValSuccess;
 };
 
 struct CallInfo {

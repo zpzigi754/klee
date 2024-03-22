@@ -641,10 +641,8 @@ void KleeHandler::processCallPath(const ExecutionState &state) {
       if (arg->isPtr) {
         *file <<"&";
         if (arg->funPtr == NULL) {
-          if (arg->isValSuccess == true) {
-            // XXX: the below caused an abort without the success check
-            *file <<"[" <<*arg->val;
-          }
+          // XXX: the below once caused an abort, but not now with the garbage value
+          *file <<"[" <<*arg->val;
           if (arg->isOutSuccess == true) {
             // XXX: the below caused an abort without the success check
             *file <<"->" <<*arg->outVal <<"]";
@@ -664,7 +662,10 @@ void KleeHandler::processCallPath(const ExecutionState &state) {
       if (ci.ret.isPtr) {
         *file <<"&";
         if (ci.ret.funPtr == NULL) {
-          *file <<"[" <<*ci.ret.val <<"]";
+          if (ci.ret.isValSuccess) {
+            // XXX: the below caused an abort without the success check
+            *file <<"[" <<*ci.ret.val <<"]";
+          }
         } else {
           *file <<ci.ret.funPtr->getName();
         }
