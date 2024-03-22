@@ -637,22 +637,21 @@ void KleeHandler::processCallPath(const ExecutionState &state) {
     for (std::vector< CallArg >::const_iterator argIter = ci.args.begin(),
            end = ci.args.end(); argIter != end; ++argIter) {
       const CallArg *arg = &*argIter;
+      *file <<*arg->expr;
       if (arg->isPtr) {
         *file <<"&";
         if (arg->funPtr == NULL) {
           if (arg->isValSuccess == true) {
             // XXX: the below caused an abort without the success check
-            *file <<*arg->val;
+            *file <<"(" <<*arg->val;
           }
           if (arg->isOutSuccess == true) {
             // XXX: the below caused an abort without the success check
-            *file <<"->" <<*arg->outVal;
+            *file <<"->" <<*arg->outVal <<")";
           }
         } else {
           *file <<arg->funPtr->getName();
         }
-      } else {
-        *file <<*arg->expr;
       }
       if (argIter+1 != end)
         *file <<",";
