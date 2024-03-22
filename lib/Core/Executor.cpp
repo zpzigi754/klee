@@ -1705,74 +1705,6 @@ ref<klee::ConstantExpr> Executor::getEhTypeidFor(ref<Expr> type_info) {
                                   Expr::Int32);
   return res;
 }
-#if 0
-void klee::FillCallInfoInput(Function* f,
-                             const std::vector< ref<Expr> > &arguments,
-                             const ExecutionState& state,
-                             const Executor& exec,
-                             CallInfo* info) {
-  const FunctionType *fType =
-      // XXX: PointerType::getElementType() and Type::getPointerElementType() is deprecated.
-      //      see https://llvm.org/docs/OpaquePointers.html
-      //      check the below again. Is it equivalent to 
-      //     `dyn_cast<FunctionType>(cast<PointerType>(f->getType())->getElementType())`?
-      f->getFunctionType();
-  assert(!fType->isVarArg() && "The interesting functions must not be vararg.");
-  assert(arguments.size() == fType->getNumParams() && "Incorrect call.");
-  int numParams = fType->getNumParams();
-  info->f = f;
-  info->args.reserve(numParams);
-  Function::arg_iterator aIter = f->arg_begin();
-  for (int i = 0; i < numParams; ++i, ++aIter) {
-    StringRef name = aIter->getName();
-    //Skip the size field of the boundptr structure.
-    if (!name.endswith(".coerce1")) {
-      llvm::Type *paramType = fType->getParamType(i);
-      info->args.push_back(CallArg());
-      CallArg *arg = &info->args.back();
-      arg->expr = arguments[i];
-      arg->isPtr = paramType->isPointerTy();
-      if (arg->isPtr) {
-        llvm::Type *elementType =
-            //  XXX: check the below agin. Is it equivalent to
-            //      `(cast<PointerType>(paramType))->getElementType()`?
-            paramType;
-        assert(isa<klee::ConstantExpr>(arguments[i]) &&
-               "No support for symbolic pointers here.");
-        //TODO: check for null pointer.
-        ref<klee::ConstantExpr> address = cast<klee::ConstantExpr>(arguments[i]);
-        if (elementType->isFunctionTy()) {
-          uint64_t addr = address->getZExtValue();
-          arg->funPtr = (Function*) addr;
-        } else {
-          Expr::Width type = exec.getWidthForLLVMType(elementType);
-          if (name.endswith(".coerce0")) {
-            int suffix_size = sizeof(".coerce0")/sizeof('.') -
-              1/*account for the '\0' */;
-            StringRef actualName = name.drop_back(suffix_size);
-            StringRef size_field_name =
-              Twine(actualName).concat(".coerce1").str();
-            Function::arg_iterator next = aIter;
-            next++;
-            assert((next->getName() == size_field_name) &&
-                   "The coerced structure is laid down in an unexpected way.");
-            assert(unsigned(i)+1 < arguments.size() &&
-                   "There must be another field of this structure");
-            ref<Expr> size_field_e = arguments[i+1];
-            assert(isa<klee::ConstantExpr>(size_field_e) &&
-                   "The size must be a compile-time constant.");
-            ref<ConstantExpr> size_field = cast<klee::ConstantExpr>(size_field_e);
-            type = 8*size_field->getZExtValue();
-          }
-          arg->outWidth = type;
-          arg->val = state.readMemoryChunk(address, type);
-          arg->funPtr = NULL;
-        }
-      }
-    }
-  }
-}
-#endif//0
 
 void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
                            std::vector<ref<Expr>> &arguments) {
@@ -2015,13 +1947,6 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
     state.pushFrame(state.prevPC, kf);
     state.pc = kf->instructions;
 
-#if 0
-    if (interpreterHandler->functionInteresting(f)){
-      state.callPath.push_back(CallInfo());
-      CallInfo *info = &state.callPath.back();
-      FillCallInfoInput(f, arguments, state, *this, info);
-    }
-#endif//0
     if (statsTracker)
       statsTracker->framePushed(state, &state.stack[state.stack.size() - 2]);
 
@@ -2274,7 +2199,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     }
 
     Function* f = ri->getParent()->getParent();
-    //if (interpreterHandler->functionInteresting(f)) {
     if (!state.callPath.empty() && f == state.callPath.back().f) {
       //FIXME: check that there are no nested "interesting functions".
       CallInfo *info = &state.callPath.back();
