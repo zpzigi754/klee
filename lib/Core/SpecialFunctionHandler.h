@@ -119,6 +119,10 @@ namespace klee {
     HANDLER(handleUnderConstrained);
     HANDLER(handleWarning);
     HANDLER(handleWarningOnce);
+    HANDLER(handleTraceParam);
+    HANDLER(handleTraceParamPtr);
+    HANDLER(handleTraceParamFPtr);
+    HANDLER(handleTraceRet);
 #undef HANDLER
   };
 } // End klee namespace

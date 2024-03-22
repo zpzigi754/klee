@@ -292,6 +292,14 @@ public:
 
   bool merge(const ExecutionState &b);
   void dumpStack(llvm::raw_ostream &out) const;
+  ref<Expr> readMemoryChunk(ref<Expr> addr,
+                            Expr::Width width) const;
+  void TraceArgValue(ref<Expr> val, std::string name);
+  void TraceArgPtr(ref<Expr> arg, Expr::Width width,
+                   std::string name);
+  void TraceArgFunPtr(ref<Expr> arg,
+                      std::string name);
+  void TraceRet();
 
   std::uint32_t getID() const { return id; };
   void setID() { id = nextID++; };

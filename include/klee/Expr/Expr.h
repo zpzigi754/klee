@@ -309,6 +309,7 @@ struct CallArg {
   ref<Expr> outVal;
   Expr::Width outWidth;
   llvm::Function* funPtr;
+  std::string name;
   // XXX: the below are temporarily added fields
   bool isOutSuccess;
 };
