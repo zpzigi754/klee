@@ -1972,15 +1972,15 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
           assert(isa<ConstantExpr>(arguments[i]) &&
                  "No support for symbolic pointers here.");
           //TODO: check for null pointer.
-          ObjectPair op;
           ref<ConstantExpr> address = cast<ConstantExpr>(arguments[i]);
           if (elementType->isFunctionTy()) {
             uint64_t addr = address->getZExtValue();
             arg->funPtr = (Function*) addr;
           } else {
+            ObjectPair op;
             bool success = state.addressSpace.resolveOne(address, op);
             // XXX: the below assertion does not hold for some reasons
-            //assert(success && "Unknown pointer argument!"); //TODO: Handle function pointers
+            //assert(success && "Unknown pointer argument!");
             // XXX: the added handler
 	    if (success) {
               const MemoryObject *mo = op.first;
@@ -2189,7 +2189,36 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // XXX: the below assertion does not hold for some reasons
       //assert(f == state.callPath.back().f);
       CallInfo *info = &state.callPath.back();
-      info->ret = result;
+      llvm::Type *retType =
+        // XXX: check the below again. 
+        //      is it equivalent to `(dyn_cast<FunctionType>(cast<PointerType>(f->getType())->getElementType()))->`
+        (f->getFunctionType())->
+        getReturnType();
+      info->ret.expr = result;
+      info->ret.isPtr = retType->isPointerTy();
+      if (info->ret.isPtr) {
+        // XXX: check the below again
+        //      it is equivalent to `(cast<PointerType>(retType))->getElementType()`?
+        llvm::Type *elementType = retType;
+        assert(isa<ConstantExpr>(result) &&
+               "No support for symbolic pointer return values.");
+        ref<ConstantExpr> address = cast<ConstantExpr>(result);
+        if (elementType->isFunctionTy()) {
+          uint64_t addr = address->getZExtValue();
+          info->ret.funPtr = (Function*) addr;
+        } else {
+          ObjectPair op;
+          bool success = state.addressSpace.resolveOne(address, op);
+          assert(success && "Unknown pointer result!");
+          const MemoryObject *mo = op.first;
+          const ObjectState *os = op.second;
+          //FIXME: assume inbounds.
+          ref<Expr> offset = mo->getOffsetExpr(address);
+          Expr::Width width = getWidthForLLVMType(elementType);
+          info->ret.val = os->read(offset, width);
+          info->ret.funPtr = NULL;
+        }
+      }
       //const FunctionType *fType =
       //  dyn_cast<FunctionType>(cast<PointerType>(f->getType())->getElementType());
       //int numParams = fType->getNumParams();
