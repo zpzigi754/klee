@@ -132,6 +132,7 @@ static constexpr std::array handlerInfo = {
   add("klee_trace_param_ptr", handleTraceParamPtr, false),
   add("klee_trace_param_fptr", handleTraceParamFPtr, false),
   add("klee_trace_ret", handleTraceRet, false),
+  add("klee_trace_ret_ptr", handleTraceRetPtr, false),
 
 #ifdef SUPPORT_KLEE_EH_CXX
   add("_klee_eh_Unwind_RaiseException_impl", handleEhUnwindRaiseExceptionImpl, false),
@@ -855,6 +856,13 @@ void SpecialFunctionHandler::handleTraceRet(ExecutionState &state,
                                             KInstruction *target,
                                             std::vector<ref<Expr> > &arguments) {
   state.TraceRet();
+}
+
+void SpecialFunctionHandler::handleTraceRetPtr(ExecutionState &state,
+                                               KInstruction *target,
+                                               std::vector<ref<Expr> > &arguments) {
+  Expr::Width width = (cast<klee::ConstantExpr>(arguments[0]))->getZExtValue();
+  state.TraceRetPtr(width);
 }
 
 void SpecialFunctionHandler::handleTraceParam(ExecutionState &state,

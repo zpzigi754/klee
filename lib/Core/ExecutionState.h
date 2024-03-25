@@ -300,6 +300,7 @@ public:
   void TraceArgFunPtr(ref<Expr> arg,
                       std::string name);
   void TraceRet();
+  void TraceRetPtr(Expr::Width width);
 
   std::uint32_t getID() const { return id; };
   void setID() { id = nextID++; };

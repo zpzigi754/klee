@@ -317,6 +317,7 @@ struct CallArg {
 struct RetVal {
   ref<Expr> expr;
   bool isPtr;
+  Expr::Width width;
   ref<Expr> val;
   llvm::Function* funPtr;
   // XXX: the below is temporarily added field
