@@ -328,6 +328,7 @@ struct CallInfo {
   llvm::Function* f;
   std::vector< CallArg > args;
   RetVal ret;
+  bool returned;
 };
 
 struct Expr::CreateArg {
