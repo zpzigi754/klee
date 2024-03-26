@@ -2141,8 +2141,10 @@ void klee::FillCallInfoOutput(Function* f,
         uint64_t addr = address->getZExtValue();
         info->ret.funPtr = (Function*) addr;
       } else {
+        if (info->ret.width == 0)
+          info->ret.width = exec.getWidthForLLVMType(elementType);
         info->ret.val = state.readMemoryChunk(address,
-                                        exec.getWidthForLLVMType(elementType));
+                                        info->ret.width);
         info->ret.funPtr = NULL;
 	// XXX: the added statement
 	info->ret.isValSuccess = true;
