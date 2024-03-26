@@ -302,6 +302,13 @@ private:
   int compare(const Expr &b, ExprEquivSet &equivs) const;
 };
 
+struct FieldDescr {
+  Expr::Width width;
+  std::string name;
+  ref<Expr> inVal;
+  ref<Expr> outVal;
+};
+
 struct CallArg {
   ref<Expr> expr;
   ref<Expr> val;
@@ -310,6 +317,7 @@ struct CallArg {
   Expr::Width outWidth;
   llvm::Function* funPtr;
   std::string name;
+  std::map<int, FieldDescr> fields;
   // XXX: the below are temporarily added fields
   bool isOutSuccess;
 };
@@ -320,6 +328,7 @@ struct RetVal {
   Expr::Width width;
   ref<Expr> val;
   llvm::Function* funPtr;
+  std::map<int, FieldDescr> fields;
   // XXX: the below is temporarily added field
   bool isValSuccess;
 };
@@ -329,6 +338,7 @@ struct CallInfo {
   std::vector< CallArg > args;
   RetVal ret;
   bool returned;
+  CallArg* getCallArgPtrp(ref<Expr> ptr);
 };
 
 struct Expr::CreateArg {

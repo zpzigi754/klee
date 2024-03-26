@@ -633,6 +633,12 @@ void KleeHandler::processCallPath(const ExecutionState &state) {
           if (arg->isOutSuccess == true) {
             // XXX: the below caused an abort without the success check
             *file <<"->" <<*arg->outVal <<"]";
+            std::map<int, FieldDescr>::const_iterator i = arg->fields.begin(),
+              e = arg->fields.end();
+            for (; i != e; ++i) {
+              *file <<"[" <<i->second.name <<":" <<*i->second.inVal << "->";
+              *file <<*i->second.outVal <<"]";
+            }
           }
         } else {
           *file <<arg->funPtr->getName();
@@ -652,6 +658,11 @@ void KleeHandler::processCallPath(const ExecutionState &state) {
           if (ci.ret.isValSuccess) {
             // XXX: the below caused an abort without the success check
             *file <<"[" <<*ci.ret.val <<"]";
+            std::map<int, FieldDescr>::const_iterator i = ci.ret.fields.begin(),
+              e = ci.ret.fields.end();
+            for (; i != e; ++i) {
+              *file <<"[" <<i->second.name <<":" <<*i->second.outVal << "]";
+            }
           }
         } else {
           *file <<ci.ret.funPtr->getName();

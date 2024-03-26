@@ -294,13 +294,16 @@ public:
   void dumpStack(llvm::raw_ostream &out) const;
   ref<Expr> readMemoryChunk(ref<Expr> addr,
                             Expr::Width width) const;
-  void TraceArgValue(ref<Expr> val, std::string name);
-  void TraceArgPtr(ref<Expr> arg, Expr::Width width,
+  void traceArgValue(ref<Expr> val, std::string name);
+  void traceArgPtr(ref<Expr> arg, Expr::Width width,
                    std::string name);
-  void TraceArgFunPtr(ref<Expr> arg,
+  void traceArgFunPtr(ref<Expr> arg,
                       std::string name);
-  void TraceRet();
-  void TraceRetPtr(Expr::Width width);
+  void traceRet();
+  void traceRetPtr(Expr::Width width);
+  void traceArgPtrField(ref<Expr> arg, int offset,
+                        Expr::Width width, std::string name);
+  void traceRetPtrField(int offset, Expr::Width width, std::string name);
 
   std::uint32_t getID() const { return id; };
   void setID() { id = nextID++; };

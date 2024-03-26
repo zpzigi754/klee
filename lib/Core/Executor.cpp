@@ -2141,11 +2141,21 @@ void klee::FillCallInfoOutput(Function* f,
         uint64_t addr = address->getZExtValue();
         info->ret.funPtr = (Function*) addr;
       } else {
-        if (info->ret.width == 0)
+        if (info->ret.width == 0) {
           info->ret.width = exec.getWidthForLLVMType(elementType);
+        }
         info->ret.val = state.readMemoryChunk(address,
                                         info->ret.width);
         info->ret.funPtr = NULL;
+        size_t base = address->getZExtValue();
+        std::map<int, FieldDescr>::iterator i = info->ret.fields.begin(),
+          e = info->ret.fields.end();
+        for (; i != e; ++i) {
+          int offset = i->first;
+          ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + offset,
+                                                           sizeof(size_t)*8);
+          i->second.outVal = state.readMemoryChunk(addrExpr, i->second.width);
+        }
 	// XXX: the added statement
 	info->ret.isValSuccess = true;
       }
@@ -2179,6 +2189,15 @@ void klee::FillCallInfoOutput(Function* f,
     CallArg *arg = &info->args[i];
     if (arg->isPtr && arg->funPtr == NULL) {
       info->args[i].outVal = state.readMemoryChunk(arg->expr, arg->outWidth);
+      size_t base = (cast<ConstantExpr>(arg->expr))->getZExtValue();
+      std::map<int, FieldDescr>::iterator j = arg->fields.begin(),
+        e = arg->fields.end();
+      for (; j != e; ++j) {
+        int offset = j->first;
+        ref<ConstantExpr> addrExpr = ConstantExpr::alloc(base + offset,
+                                                         sizeof(size_t)*8);
+        j->second.outVal = state.readMemoryChunk(addrExpr, j->second.width);
+      }
       // XXX: the added statement
       info->args[i].isOutSuccess = true;
     }
