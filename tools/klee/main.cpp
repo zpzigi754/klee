@@ -301,7 +301,6 @@ private:
   Interpreter *m_interpreter;
   TreeStreamWriter *m_pathWriter, *m_symPathWriter;
   std::unique_ptr<llvm::raw_ostream> m_infoFile;
-  std::map<const Function*, bool> m_functionsOfInterestCache;
 
   SmallString<128> m_outputDirectory;
 
@@ -334,8 +333,6 @@ public:
                        const char *errorMessage,
                        const char *errorSuffix);
   void processCallPath(const ExecutionState &state);
-  bool functionInteresting(const Function* fun);
-
   std::string getOutputFilename(const std::string &filename);
   std::unique_ptr<llvm::raw_fd_ostream> openOutputFile(const std::string &filename);
   std::string getTestFilename(const std::string &suffix, unsigned id);
@@ -611,18 +608,6 @@ void KleeHandler::processTestCase(const ExecutionState &state,
     m_interpreter->prepareForEarlyExit();
     klee_error("EXITING ON ERROR:\n%s\n", errorMessage);
   }
-}
-
-bool KleeHandler::functionInteresting(const Function* fun) {
-  std::map<const Function*, bool>::iterator iter = m_functionsOfInterestCache.find(fun);
-  if (iter != m_functionsOfInterestCache.end()) {
-    return iter->second;
-  }
-  bool rez = false;
-  StringRef name = fun->getName();
-  rez = name.contains("islet");
-  m_functionsOfInterestCache.insert(std::make_pair(fun, rez));
-  return rez;
 }
 
 void KleeHandler::processCallPath(const ExecutionState &state) {
