@@ -862,6 +862,7 @@ void SpecialFunctionHandler::handleTraceRetPtr(ExecutionState &state,
                                                KInstruction *target,
                                                std::vector<ref<Expr> > &arguments) {
   Expr::Width width = (cast<klee::ConstantExpr>(arguments[0]))->getZExtValue();
+  width = width * 8;
   state.TraceRetPtr(width);
 }
 
